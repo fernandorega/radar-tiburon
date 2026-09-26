@@ -2,23 +2,26 @@ name: Radar Tiburon Alertas
 
 on:
   schedule:
-    # 09:10 hora España (UTC+2 en verano) = 07:10 UTC
-    - cron: '10 7 * * 1-5'
-    # 16:40 hora España = 14:40 UTC
-    - cron: '40 14 * * 1-5'
-  workflow_dispatch:  # Permite ejecutarlo manualmente desde GitHub
+    - cron: '*/10 6-18 * * 1-5'
+  workflow_dispatch:
 
 jobs:
   ejecutar-radar:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install yfinance pandas numpy
-      - run: python radar_headless.py
+
+      - name: Instalar dependencias
+        run: |
+          pip install yfinance pandas numpy tzdata
+
+      - name: Ejecutar radar
         env:
           EMAIL_REMITENTE: ${{ secrets.EMAIL_REMITENTE }}
           EMAIL_PASSWORD_APP: ${{ secrets.EMAIL_PASSWORD_APP }}
           EMAIL_DESTINO: ${{ secrets.EMAIL_DESTINO }}
+        run: python radar_headless.py
