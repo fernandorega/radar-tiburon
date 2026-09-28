@@ -40,7 +40,7 @@ config_alertas = cargar_json(F_ALERTAS, {
     "ultimas_alertas": {}
 })
 
-# ==================== REGLAS ACTUALES (INTACTAS) ====================
+# ==================== REGLAS ACTUALES ====================
 REGLAS = {
     "S&P 500": {"ticker": "^GSPC", "c1": -0.04, "c2": -0.10, "c3": -0.20, "v1": 0.15, "v2": 0.30, "v3": 0.40, "rsi_v1": 70, "rsi_v2": 75, "rsi_v3": 80},
     "Nasdaq 100": {"ticker": "^NDX", "c1": -0.06, "c2": -0.15, "c3": -0.25, "v1": 0.18, "v2": 0.35, "v3": 0.45, "rsi_v1": 70, "rsi_v2": 75, "rsi_v3": 80},
@@ -124,7 +124,7 @@ def grafico_dow(dow, nombre):
     fig.update_layout(title=f"{nombre} — Estructura {dow['trend']}", height=350, margin=dict(l=20, r=20, t=50, b=20), hovermode='x unified', showlegend=False)
     return fig
 
-# ==================== FUNCIONES DE TIMING (ADX Y VOLUMEN) ====================
+# ==================== FUNCIONES DE TIMING ====================
 def calcular_adx(hist):
     try:
         df = hist.copy()
@@ -211,6 +211,41 @@ def enviar_alerta(asunto, cuerpo):
         except Exception as e: r.append(f"TG Error: {e}")
     return " | ".join(r) if r else "Sin canales activos"
 
+def generar_resumen_completo(vix_val):
+    linea = "=" * 48
+    cuerpo = [
+        "📊 RESUMEN EJECUTIVO — RADAR TIBURÓN",
+        f"Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"Macro Global (VIX): {vix_val:.2f} — {'Pánico / Estrés' if vix_val >= 20 else 'Mercado Estable'}",
+        linea,
+        ""
+    ]
+    for cat, reglas in REGLAS.items():
+        d = datos(reglas["ticker"])
+        if not d: continue
+        zona_c, dec_c, motivo_c = decidir_compra(d, reglas, vix_val)
+        zona_v, dec_v, motivo_v = decidir_venta(d, reglas)
+        fl_data = flujo(reglas["ticker"])
+        sc = fl_data["score"] if fl_data else 0
+        dow = dow_theory(d["hist"])
+        dow_txt = f"{dow['trend']} ({dow['det']})" if dow else "N/D"
+        es_fondo = cat in ["S&P 500", "Nasdaq 100"]
+        tipo = "FONDO (Traspaso 5-15 días)" if es_fondo else "ETP (Inmediato)"
+        divisa = "$" if cat in ["S&P 500", "Nasdaq 100", "Oro", "Bitcoin"] else "€"
+        
+        cuerpo.append(f"🔹 {cat.upper()} [{tipo}]")
+        cuerpo.append(f"  • Cotización: {d['precio']:,.2f} {divisa} | Descuento 52w: {d['caida']:.2%}")
+        cuerpo.append(f"  • Línea Vital SMA200: {d['sma200']:,.2f} {divisa} ({d['dist_sma']:+.2%}) | RSI: {d['rsi']:.1f}")
+        cuerpo.append(f"  • Señal Compra: {dec_c} -> {motivo_c}")
+        cuerpo.append(f"  • Señal Venta: {dec_v} -> {motivo_v}")
+        cuerpo.append(f"  • Flujo Institucional: Score {sc:+d} (OBV: {fl_data['obv_sig'] if fl_data else 'N/D'})")
+        cuerpo.append(f"  • Teoría de Dow: {dow_txt}")
+        cuerpo.append("")
+        
+    cuerpo.append(linea)
+    cuerpo.append("Informe generado a petición del usuario desde Radar DCA.")
+    return "\n".join(cuerpo)
+
 # ==================== INTERFAZ ====================
 st.title("🦈 Radar DCA (Escáner de Mercado)")
 v = vix()
@@ -248,9 +283,9 @@ with tab1:
         dow = dow_theory(d["hist"])
         dow_txt = f"{dow['color']} {dow['trend']}" if dow else "N/D"
 
-        # Badge operativo: timing de ejecución
         es_fondo = cat in ["S&P 500", "Nasdaq 100"]
         badge_operativo = "⏱️ TRASPASO 5-15 días" if es_fondo else "⚡ INMEDIATO (segundos)"
+        divisa = "$" if cat in ["S&P 500", "Nasdaq 100", "Oro", "Bitcoin"] else "€"
 
         if dec_c == "BLOQUEADO": ic = "🛡️"
         elif zona_c > 0: ic = ["🟢", "🟠", "🔴"][zona_c - 1]
@@ -259,25 +294,25 @@ with tab1:
 
         with st.expander(f"{ic} **{cat}** | {badge_operativo} | {dec_c} | {dec_v} | Estructura: {dow_txt}", expanded=(zona_c > 0 or zona_v > 0 or dec_c == "BLOQUEADO")):
             c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Precio Real", f"{d['precio']:,.2f}")
+            c1.metric("Precio Real", f"{d['precio']:,.2f} {divisa}")
             c2.metric("Descuento", f"{d['caida']:.2%}")
-            c3.metric("Línea Vital (SMA200)", f"{d['sma200']:,.2f}", f"{d['dist_sma']:+.2%}")
+            c3.metric("Línea Vital (SMA200)", f"{d['sma200']:,.2f} {divisa}", f"{d['dist_sma']:+.2%}")
             c4.metric("Fuerza Institucional", f"{sc:+d}")
             
             st.divider()
 
             # --- GATILLO DE DESBLOQUEO ---
             if dec_c == "BLOQUEADO":
-                vix_req = 13 if zona_c == 1 else (17 if zona_c == 2 else 22)
+                vix_req = 13 if zona_c == 1 else (17 if zona_c == 2 else (22 if zona_c == 3 else 18))
                 p_gatillo = d['max_52w'] * 0.75
                 caida_req = ((d['precio'] - p_gatillo) / d['precio']) * 100 if d['precio'] > p_gatillo else 0.0
                 
                 st.warning(f"#### 🛡️ COMPRA BLOQUEADA: {motivo_c}")
                 st.markdown(f"""
-                **Gatillo de Desbloqueo (Zona {zona_c}):**
+                **Gatillo de Desbloqueo (Zona {zona_c if zona_c > 0 else 'Base'}):**
                 1. VIX necesario: **{vix_req}**
                 2. Diferencia actual: **Faltan {(vix_req - v):.2f} puntos de VIX**
-                3. Precio gatillo (Capitulación total): **{p_gatillo:,.2f} €**
+                3. Precio gatillo (Capitulación total): **{p_gatillo:,.2f} {divisa}**
                 4. Caída adicional necesaria: **-{caida_req:.2f}%** desde el precio de hoy
                 5. **Tres escenarios de desbloqueo posibles:**
                    - 🅰️ VIX sube al necesario manteniendo precio → *desbloqueo por pánico*
@@ -377,7 +412,8 @@ with tab2:
             c1, c2, c3 = st.columns(3)
             c1.metric("1. Presión (OBV)", f"{fl_data['obv']:+.2%}", fl_data["obv_sig"])
             c2.metric("2. Cierres (A/D Line)", f"{fl_data['ad']:+.2%}", fl_data["ad_sig"])
-            c3.metric("3. Precio Tiburón (VWAP)", f"{fl_data['vwap']:,.2f}", f"{fl_data['dist_vwap']:+.2%}")
+            # FIX DE ESCALA: :+.2f% en lugar de :+.2% para evitar el error visual de -582.37%
+            c3.metric("3. Precio Tiburón (VWAP)", f"{fl_data['vwap']:,.2f}", f"{fl_data['dist_vwap']:+.2f}%")
 
 with tab3:
     st.subheader("📰 Diario: Teoría de Dow")
@@ -411,16 +447,31 @@ with tab4:
             st.success("✅ Datos guardados correctamente. Espacios en contraseña eliminados.")
 
     st.divider()
-    st.subheader("🧪 Comprobación de Correo")
-    st.caption("Pulsa el botón inferior para enviar un email en tiempo real con las credenciales guardadas.")
+    st.subheader("📬 Enviar Informe Completo Bajo Demanda")
+    st.caption("Genera y envía un correo con el estado macro global, los semáforos de compra/venta, flujo institucional y la estructura de Dow Theory.")
     
-    if st.button("📨 Enviar email de prueba ahora"):
-        with st.spinner("Conectando con los servidores SMTP de Google..."):
+    if st.button("📊 Enviar Informe Completo al Email"):
+        with st.spinner("Compilando métricas y conectando con el servidor de correo..."):
+            resumen = generar_resumen_completo(v)
             res = enviar_alerta(
-                "🦈 Radar Tiburón: Prueba de Alerta",
-                f"¡Conexión verificada con éxito!\n\nEste es un correo de prueba enviado desde tu Radar DCA.\nFecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\nVIX actual: {v:.2f}"
+                f"🦈 Radar Tiburón: Informe de Mercado ({datetime.now().strftime('%d/%m/%Y')})",
+                resumen
+            )
+            if "Error" in res or "Faltan" in res:
+                st.error(f"❌ Fallo al enviar el informe: {res}")
+            else:
+                st.success(f"🎉 Informe completo enviado a {config_alertas.get('email_destino')}.")
+
+    st.divider()
+    st.subheader("🧪 Comprobación Rápida")
+    st.caption("Envía un ping básico de comprobación técnica.")
+    if st.button("📨 Enviar ping de prueba"):
+        with st.spinner("Comprobando conexión SMTP..."):
+            res = enviar_alerta(
+                "🦈 Radar Tiburón: Prueba Técnica",
+                f"¡Ping exitoso!\nFecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\nVIX actual: {v:.2f}"
             )
             if "Error" in res or "Faltan" in res:
                 st.error(f"❌ Fallo en el envío: {res}")
             else:
-                st.success(f"🎉 Correo enviado correctamente a {config_alertas.get('email_destino')}. Revisa tu bandeja de entrada.")
+                st.success("🎉 Correo de prueba enviado.")
