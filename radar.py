@@ -13,6 +13,19 @@ import plotly.graph_objects as go
 
 st.set_page_config(page_title="🦈 Radar Tiburón", page_icon="🦈", layout="wide")
 
+# ==================== ESTILOS VISUALES (CONTRASTE) ====================
+st.markdown("""
+<style>
+    .stAlert {
+        border-radius: 8px;
+        font-weight: 500;
+    }
+    div[data-testid="stMetricValue"] {
+        font-size: 1.6rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # ==================== RUTAS ====================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 F_ALERTAS = os.path.join(BASE_DIR, "config_alertas.json")
@@ -81,19 +94,35 @@ def flujo(ticker):
         h = yf.Ticker(ticker).history(period="1y")
         if len(h) < 60: return None
         d = h.copy()
+        
+        # Normalización matemática por volumen real acumulado de 20 sesiones
+        vol_20 = float(d['Volume'].tail(20).sum())
+        if vol_20 <= 0: vol_20 = 1.0
+
         dir_ = np.sign(d['Close'].diff()).fillna(0)
         d['OBV'] = (d['Volume'] * dir_).cumsum()
-        obv_s = (d['OBV'].iloc[-1] - d['OBV'].iloc[-20]) / abs(d['OBV'].iloc[-20]) if d['OBV'].iloc[-20] else 0
+        obv_diff = float(d['OBV'].iloc[-1] - d['OBV'].iloc[-20])
+        obv_s = obv_diff / vol_20
         obv_sig = "ALCISTA" if obv_s > 0.05 else "BAJISTA" if obv_s < -0.05 else "NEUTRAL"
+
         hl = (d['High'] - d['Low']).replace(0, 1e-9)
         d['AD'] = ((((d['Close']-d['Low']) - (d['High']-d['Close'])) / hl) * d['Volume']).cumsum()
-        ad_s = (d['AD'].iloc[-1] - d['AD'].iloc[-20]) / abs(d['AD'].iloc[-20]) if d['AD'].iloc[-20] else 0
+        ad_diff = float(d['AD'].iloc[-1] - d['AD'].iloc[-20])
+        ad_s = ad_diff / vol_20
         ad_sig = "ACUMULACIÓN" if ad_s > 0.05 else "DISTRIBUCIÓN" if ad_s < -0.05 else "NEUTRAL"
+
         da = d.loc[d['Low'].iloc[-min(252, len(d)):].idxmin():]
         vwap = float((da['Close']*da['Volume']).sum()/da['Volume'].sum()) if da['Volume'].sum() else float(d['Close'].iloc[-1])
         sma50, p = float(d['Close'].rolling(50).mean().iloc[-1]), float(d['Close'].iloc[-1])
         sma200 = float(d['Close'].rolling(200).mean().iloc[-1]) if len(d) >= 200 else sma50
-        score = sum([1 if obv_sig=="ALCISTA" else -1 if obv_sig=="BAJISTA" else 0, 1 if ad_sig=="ACUMULACIÓN" else -1 if ad_sig=="DISTRIBUCIÓN" else 0, 1 if (p/vwap-1)>0 else -1, 1 if p>sma50 else -1, 1 if p>sma200 else -1])
+        
+        score = sum([
+            1 if obv_sig=="ALCISTA" else -1 if obv_sig=="BAJISTA" else 0,
+            1 if ad_sig=="ACUMULACIÓN" else -1 if ad_sig=="DISTRIBUCIÓN" else 0,
+            1 if (p/vwap-1)>0 else -1,
+            1 if p>sma50 else -1,
+            1 if p>sma200 else -1
+        ])
         return {"score": score, "obv": obv_s, "obv_sig": obv_sig, "ad": ad_s, "ad_sig": ad_sig, "vwap": vwap, "dist_vwap": (p/vwap-1)*100, "p": p}
     except: return None
 
@@ -118,10 +147,35 @@ def dow_theory(hist, order=5):
 def grafico_dow(dow, nombre):
     close = dow["close"]
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=close.index, y=close.values, mode='lines', name='Precio', line=dict(color='#1f77b4', width=2)))
-    fig.add_trace(go.Scatter(x=[close.index[dow["m1"]], close.index[dow["m2"]]], y=[close.iloc[dow["m1"]], close.iloc[dow["m2"]]], mode='markers+text', name='Máximos', marker=dict(color='#d62728', size=14, symbol='triangle-down', line=dict(color='white', width=2)), text=[f"{close.iloc[dow['m1']]:.2f}", f"{close.iloc[dow['m2']]:.2f}"], textposition='top center', textfont=dict(size=11, color='#d62728')))
-    fig.add_trace(go.Scatter(x=[close.index[dow["n1"]], close.index[dow["n2"]]], y=[close.iloc[dow["n1"]], close.iloc[dow["n2"]]], mode='markers+text', name='Mínimos', marker=dict(color='#2ca02c', size=14, symbol='triangle-up', line=dict(color='white', width=2)), text=[f"{close.iloc[dow['n1']]:.2f}", f"{close.iloc[dow['n2']]:.2f}"], textposition='bottom center', textfont=dict(size=11, color='#2ca02c')))
-    fig.update_layout(title=f"{nombre} — Estructura {dow['trend']}", height=350, margin=dict(l=20, r=20, t=50, b=20), hovermode='x unified', showlegend=False)
+    fig.add_trace(go.Scatter(x=close.index, y=close.values, mode='lines', name='Precio', line=dict(color='#3b82f6', width=2)))
+    fig.add_trace(go.Scatter(
+        x=[close.index[dow["m1"]], close.index[dow["m2"]]],
+        y=[close.iloc[dow["m1"]], close.iloc[dow["m2"]]],
+        mode='markers+text',
+        name='Máximos',
+        marker=dict(color='#ef4444', size=13, symbol='triangle-down'),
+        text=[f"{close.iloc[dow['m1']]:.2f}", f"{close.iloc[dow['m2']]:.2f}"],
+        textposition='top center',
+        textfont=dict(size=12, color='#ef4444')
+    ))
+    fig.add_trace(go.Scatter(
+        x=[close.index[dow["n1"]], close.index[dow["n2"]]],
+        y=[close.iloc[dow["n1"]], close.iloc[dow["n2"]]],
+        mode='markers+text',
+        name='Mínimos',
+        marker=dict(color='#22c55e', size=13, symbol='triangle-up'),
+        text=[f"{close.iloc[dow['n1']]:.2f}", f"{close.iloc[dow['n2']]:.2f}"],
+        textposition='bottom center',
+        textfont=dict(size=12, color='#22c55e')
+    ))
+    fig.update_layout(
+        title=f"{nombre} — Estructura {dow['trend']}",
+        height=420,
+        margin=dict(l=25, r=25, t=50, b=25),
+        hovermode='x unified',
+        showlegend=False,
+        yaxis=dict(autorange=True, fixedrange=False)
+    )
     return fig
 
 # ==================== FUNCIONES DE TIMING ====================
@@ -183,21 +237,21 @@ def decidir_venta(d, reglas):
     if ds >= reglas["v1"] and rsi >= reglas["rsi_v1"]: return 1, "VENTA ZONA 1", "Tensión alcista."
     return 0, "MANTENER", "Dentro de parámetros sanos."
 
-def enviar_alerta(asunto, cuerpo):
+def enviar_alerta(asunto, cuerpo, forzar_email=False):
     r, c = [], config_alertas
-    if c.get("email_activo"):
+    if c.get("email_activo") or forzar_email:
         remitente = c.get("email_remitente", "").strip()
         password = c.get("email_password_app", "").replace(" ", "").strip()
         destino = c.get("email_destino", "").strip()
         if not remitente or not password or not destino:
-            return "Email: Faltan credenciales"
+            return "Email: Faltan credenciales (remitente, contraseña o destino)"
         try:
             msg = MIMEMultipart()
             msg['From'] = remitente
             msg['To'] = destino
             msg['Subject'] = asunto
             msg.attach(MIMEText(cuerpo, 'plain', 'utf-8'))
-            with smtplib.SMTP('smtp.gmail.com', 587, timeout=12) as s:
+            with smtplib.SMTP('smtp.gmail.com', 587, timeout=15) as s:
                 s.starttls()
                 s.login(remitente, password)
                 s.send_message(msg)
@@ -209,7 +263,7 @@ def enviar_alerta(asunto, cuerpo):
             res = requests.post(f"https://api.telegram.org/bot{c['telegram_bot_token']}/sendMessage", data={"chat_id": c["telegram_chat_id"], "text": f"*{asunto}*\n\n{cuerpo}", "parse_mode": "Markdown"}, timeout=10)
             r.append(f"TG: {res.status_code}")
         except Exception as e: r.append(f"TG Error: {e}")
-    return " | ".join(r) if r else "Sin canales activos"
+    return " | ".join(r) if r else "Sin canales activos (marca la casilla 'Activar Email' y guarda)"
 
 def generar_resumen_completo(vix_val):
     linea = "=" * 48
@@ -295,7 +349,7 @@ with tab1:
         with st.expander(f"{ic} **{cat}** | {badge_operativo} | {dec_c} | {dec_v} | Estructura: {dow_txt}", expanded=(zona_c > 0 or zona_v > 0 or dec_c == "BLOQUEADO")):
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Precio Real", f"{d['precio']:,.2f} {divisa}")
-            c2.metric("Descuento", f"{d['caida']:.2%}")
+            c2.metric("Descuento (52w)", f"{d['caida']:.2%}")
             c3.metric("Línea Vital (SMA200)", f"{d['sma200']:,.2f} {divisa}", f"{d['dist_sma']:+.2%}")
             c4.metric("Fuerza Institucional", f"{sc:+d}")
             
@@ -408,11 +462,10 @@ with tab2:
         fl_data = flujo(reglas["ticker"])
         if not fl_data: continue
         ic = "🟢" if fl_data['score'] >= 2 else "⚪" if fl_data['score'] >= 0 else "🔴"
-        with st.expander(f"{ic} **{cat}** — Score Institucional Total: {fl_data['score']:+d}"):
+        with st.expander(f"{ic} **{cat}** — Score Institucional Total: {fl_data['score']:+d}", expanded=True):
             c1, c2, c3 = st.columns(3)
-            c1.metric("1. Presión (OBV)", f"{fl_data['obv']:+.2%}", fl_data["obv_sig"])
-            c2.metric("2. Cierres (A/D Line)", f"{fl_data['ad']:+.2%}", fl_data["ad_sig"])
-            # FIX DE ESCALA: :+.2f% en lugar de :+.2% para evitar el error visual de -582.37%
+            c1.metric("1. Presión (OBV / Vol)", f"{fl_data['obv']:+.1%}", fl_data["obv_sig"])
+            c2.metric("2. Cierres (A/D / Vol)", f"{fl_data['ad']:+.1%}", fl_data["ad_sig"])
             c3.metric("3. Precio Tiburón (VWAP)", f"{fl_data['vwap']:,.2f}", f"{fl_data['dist_vwap']:+.2f}%")
 
 with tab3:
@@ -422,7 +475,7 @@ with tab3:
         if not d: continue
         dow = dow_theory(d["hist"])
         if not dow: continue
-        with st.expander(f"{dow['color']} **{cat}** — Tendencia {dow['trend']}", expanded=False):
+        with st.expander(f"{dow['color']} **{cat}** — Tendencia {dow['trend']}", expanded=True):
             st.markdown(f"**Estructura actual:** `{dow['det']}`")
             st.plotly_chart(grafico_dow(dow, cat), use_container_width=True)
 
@@ -445,6 +498,7 @@ with tab4:
             })
             guardar_json(F_ALERTAS, config_alertas)
             st.success("✅ Datos guardados correctamente. Espacios en contraseña eliminados.")
+            st.rerun()
 
     st.divider()
     st.subheader("📬 Enviar Informe Completo Bajo Demanda")
@@ -455,12 +509,13 @@ with tab4:
             resumen = generar_resumen_completo(v)
             res = enviar_alerta(
                 f"🦈 Radar Tiburón: Informe de Mercado ({datetime.now().strftime('%d/%m/%Y')})",
-                resumen
+                resumen,
+                forzar_email=True
             )
-            if "Error" in res or "Faltan" in res:
-                st.error(f"❌ Fallo al enviar el informe: {res}")
+            if "Email: OK" in res:
+                st.success(f"🎉 Informe completo enviado a {config_alertas.get('email_destino')}. Revisa tu bandeja de entrada.")
             else:
-                st.success(f"🎉 Informe completo enviado a {config_alertas.get('email_destino')}.")
+                st.error(f"❌ Fallo al enviar el informe: {res}")
 
     st.divider()
     st.subheader("🧪 Comprobación Rápida")
@@ -469,9 +524,10 @@ with tab4:
         with st.spinner("Comprobando conexión SMTP..."):
             res = enviar_alerta(
                 "🦈 Radar Tiburón: Prueba Técnica",
-                f"¡Ping exitoso!\nFecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\nVIX actual: {v:.2f}"
+                f"¡Ping exitoso!\nFecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\nVIX actual: {v:.2f}",
+                forzar_email=True
             )
-            if "Error" in res or "Faltan" in res:
-                st.error(f"❌ Fallo en el envío: {res}")
+            if "Email: OK" in res:
+                st.success(f"🎉 Correo de prueba enviado a {config_alertas.get('email_destino')}.")
             else:
-                st.success("🎉 Correo de prueba enviado.")
+                st.error(f"❌ Fallo en el envío: {res}")
