@@ -11,18 +11,13 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 import plotly.graph_objects as go
 
-st.set_page_config(page_title="🦈 Radar Tiburón", page_icon="🦈", layout="wide")
+st.set_page_config(page_title="🦈 Radar Tiburón Pro", page_icon="🦈", layout="wide")
 
 # ==================== ESTILOS VISUALES (CONTRASTE) ====================
 st.markdown("""
 <style>
-    .stAlert {
-        border-radius: 8px;
-        font-weight: 500;
-    }
-    div[data-testid="stMetricValue"] {
-        font-size: 1.6rem;
-    }
+    .stAlert { border-radius: 8px; font-weight: 500; }
+    div[data-testid="stMetricValue"] { font-size: 1.6rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -53,7 +48,7 @@ config_alertas = cargar_json(F_ALERTAS, {
     "ultimas_alertas": {}
 })
 
-# ==================== REGLAS ACTUALES ====================
+# ==================== REGLAS CALIBRADAS ====================
 REGLAS = {
     "S&P 500": {"ticker": "^GSPC", "c1": -0.04, "c2": -0.10, "c3": -0.20, "v1": 0.15, "v2": 0.30, "v3": 0.40, "rsi_v1": 70, "rsi_v2": 75, "rsi_v3": 80},
     "Nasdaq 100": {"ticker": "^NDX", "c1": -0.06, "c2": -0.15, "c3": -0.25, "v1": 0.18, "v2": 0.35, "v3": 0.45, "rsi_v1": 70, "rsi_v2": 75, "rsi_v3": 80},
@@ -72,21 +67,40 @@ def datos(ticker):
     try:
         h = yf.Ticker(ticker).history(period="2y")
         if len(h) < 200: return None
-        h52 = h.tail(252)
+        
+        # Corrección matemática de ventana: 365 días reales para Cripto, 252 sesiones para el resto
+        dias_lookback = 365 if ("BTC" in ticker or "ETH" in ticker) else 252
+        h52 = h.iloc[-dias_lookback:].copy() if len(h) >= dias_lookback else h.copy()
+        
         p = float(h52['Close'].iloc[-1])
-        mx = float(h52['Close'].max())
-        caida = (p/mx - 1) if mx > 0 else 0
+        mx = float(h52['High'].max())
+        caida = (p/mx - 1) if mx > 0 else 0.0
+        
         sma200 = float(h['Close'].rolling(200).mean().iloc[-1])
-        dist_sma = (p/sma200 - 1) if sma200 > 0 else 0
+        dist_sma = (p/sma200 - 1) if sma200 > 0 else 0.0
+        
         delta = h52['Close'].diff()
         g = delta.clip(lower=0).ewm(alpha=1/14, adjust=False).mean()
         l = -delta.clip(upper=0).ewm(alpha=1/14, adjust=False).mean()
         rsi = float((100 - 100/(1 + g/l.replace(0,1e-9))).iloc[-1])
-        idx_mx = h52['Close'].idxmax()
+        
+        # Break of Structure (BOS): Cierre actual supera el máximo de las 10 sesiones anteriores
+        max_10d_prev = h52['High'].shift(1).rolling(10).max().iloc[-1]
+        bos = bool(p > max_10d_prev) if not pd.isna(max_10d_prev) else False
+        
+        # Corrección blindada contra KeyError por índice temporal (uso de iloc y get_loc)
+        idx_mx = h52['High'].idxmax()
         dias_mx = (h52.index[-1] - idx_mx).days
-        mn = float(h52['Close'].loc[idx_mx:].min())
-        return {"precio": p, "caida": caida, "sma200": sma200, "dist_sma": dist_sma, "rsi": rsi if not pd.isna(rsi) else 50.0, "max_52w": mx, "dias_desde_max": dias_mx, "rebote": (p/mn - 1) if mn > 0 else 0, "hist": h}
-    except: return None
+        pos_mx = h52.index.get_loc(idx_mx)
+        mn = float(h52['Close'].iloc[pos_mx:].min())
+        
+        return {
+            "precio": p, "caida": caida, "sma200": sma200, "dist_sma": dist_sma,
+            "rsi": rsi if not pd.isna(rsi) else 50.0, "max_52w": mx, "dias_desde_max": dias_mx,
+            "rebote": (p/mn - 1) if mn > 0 else 0.0, "hist": h, "bos": bos
+        }
+    except Exception as e:
+        return None
 
 @st.cache_data(ttl=300)
 def flujo(ticker):
@@ -95,7 +109,6 @@ def flujo(ticker):
         if len(h) < 60: return None
         d = h.copy()
         
-        # Normalización matemática por volumen real acumulado de 20 sesiones
         vol_20 = float(d['Volume'].tail(20).sum())
         if vol_20 <= 0: vol_20 = 1.0
 
@@ -178,7 +191,7 @@ def grafico_dow(dow, nombre):
     )
     return fig
 
-# ==================== FUNCIONES DE TIMING ====================
+# ==================== TIMING Y VOLUMEN ====================
 def calcular_adx(hist):
     try:
         df = hist.copy()
@@ -202,13 +215,14 @@ def calcular_adx(hist):
         return df[['+DI', '-DI', 'ADX']]
     except: return None
 
-def evaluar_volumen(hist):
+def evaluar_volumen(hist, ticker):
     try:
+        if ticker.startswith("^"): return 1.0  # Índices sintéticos
         df = hist.copy()
         if len(df) < 20: return 1.0
         vol_sma20 = df['Volume'].rolling(20).mean().iloc[-1]
         vol_actual = df['Volume'].iloc[-1]
-        return vol_actual / vol_sma20 if vol_sma20 > 0 else 1.0
+        return float(vol_actual / vol_sma20) if vol_sma20 > 0 else 1.0
     except: return 1.0
 
 # ==================== LÓGICA DE DECISIÓN ====================
@@ -216,19 +230,35 @@ def filtro_anti_cuchillo(d, v):
     c = abs(d["caida"])
     if c >= 0.10 and v < 13: return False, "Bloquea si caída >= 10% y VIX < 13"
     if c >= 0.15 and v < 17: return False, "Bloquea si caída >= 15% y VIX < 17"
-    if c >= 0.25 and v < 22: return False, "Bloquea si caída >= 25% y VIX < 22"
+    if c >= 0.25 and v < 20: return False, "Bloquea si caída >= 25% y VIX < 20"
     if d["precio"] < d["sma200"] * 0.95 and v < 18: return False, "Bloquea si precio < SMA200*0.95 y VIX < 18"
     return True, "OK"
 
-def decidir_compra(d, reglas, v):
+def decidir_compra(d, reglas, v, ticker):
     caida = d["caida"]
     if caida <= reglas["c3"]: zona = 3
     elif caida <= reglas["c2"]: zona = 2
     elif caida <= reglas["c1"]: zona = 1
     else: return 0, "ESPERAR", f"Falta caída. Descuento actual: {caida:.2%}."
+    
+    # 1. Filtro VIX Pánico para Zona 3 (Devuelve 0 para evitar alertas falsas y activar el bloque de bloqueo)
+    if zona == 3 and v < 20.0:
+        return 0, "BLOQUEADO VIX", f"Zona 3 requiere pánico real (VIX >= 20). VIX actual: {v:.1f}"
+
+    # 2. Filtro Anti-Cuchillo Clásico
     seguro, motivo = filtro_anti_cuchillo(d, v)
-    if not seguro: return zona, "BLOQUEADO", motivo
-    return zona, f"COMPRAR ZONA {zona}", "Señal activada por reglas de caída y VIX."
+    if not seguro: return 0, "BLOQUEADO", motivo
+    
+    # 3. Filtro de Volumen Antitrampa (Cava)
+    ratio = evaluar_volumen(d["hist"], ticker)
+    if ratio < 0.85 and not ticker.startswith("^"):
+        return 0, "BLOQUEADO VOLUMEN", f"Volumen institucional débil ({ratio:.2f}x < 0.85x). Sin absorción."
+        
+    # 4. Quiebre de Estructura (BOS) para rebotes en caídas mayores
+    if zona >= 2 and not d["bos"] and v < 25:
+        return 0, "BLOQUEADO BOS", "Sin confirmación de giro diario (BOS 10d). Esperar quiebre."
+
+    return zona, f"COMPRAR ZONA {zona}", f"Caída {caida:.2%}, VIX {v:.1f}, Vol {ratio:.2f}x. Confirmado."
 
 def decidir_venta(d, reglas):
     ds, rsi = d["dist_sma"], d["rsi"]
@@ -244,7 +274,7 @@ def enviar_alerta(asunto, cuerpo, forzar_email=False):
         password = c.get("email_password_app", "").replace(" ", "").strip()
         destino = c.get("email_destino", "").strip()
         if not remitente or not password or not destino:
-            return "Email: Faltan credenciales (remitente, contraseña o destino)"
+            return "Email: Faltan credenciales"
         try:
             msg = MIMEMultipart()
             msg['From'] = remitente
@@ -263,12 +293,12 @@ def enviar_alerta(asunto, cuerpo, forzar_email=False):
             res = requests.post(f"https://api.telegram.org/bot{c['telegram_bot_token']}/sendMessage", data={"chat_id": c["telegram_chat_id"], "text": f"*{asunto}*\n\n{cuerpo}", "parse_mode": "Markdown"}, timeout=10)
             r.append(f"TG: {res.status_code}")
         except Exception as e: r.append(f"TG Error: {e}")
-    return " | ".join(r) if r else "Sin canales activos (marca la casilla 'Activar Email' y guarda)"
+    return " | ".join(r) if r else "Sin canales activos"
 
 def generar_resumen_completo(vix_val):
     linea = "=" * 48
     cuerpo = [
-        "📊 RESUMEN EJECUTIVO — RADAR TIBURÓN",
+        "📊 RESUMEN EJECUTIVO — RADAR TIBURÓN PRO",
         f"Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         f"Macro Global (VIX): {vix_val:.2f} — {'Pánico / Estrés' if vix_val >= 20 else 'Mercado Estable'}",
         linea,
@@ -277,14 +307,14 @@ def generar_resumen_completo(vix_val):
     for cat, reglas in REGLAS.items():
         d = datos(reglas["ticker"])
         if not d: continue
-        zona_c, dec_c, motivo_c = decidir_compra(d, reglas, vix_val)
+        zona_c, dec_c, motivo_c = decidir_compra(d, reglas, vix_val, reglas["ticker"])
         zona_v, dec_v, motivo_v = decidir_venta(d, reglas)
         fl_data = flujo(reglas["ticker"])
         sc = fl_data["score"] if fl_data else 0
         dow = dow_theory(d["hist"])
         dow_txt = f"{dow['trend']} ({dow['det']})" if dow else "N/D"
         es_fondo = cat in ["S&P 500", "Nasdaq 100"]
-        tipo = "FONDO (Traspaso 5-15 días)" if es_fondo else "ETP (Inmediato)"
+        tipo = "FONDO (Traspaso 5-15 días)" if es_fondo else "ETP/Crypto (Inmediato)"
         divisa = "$" if cat in ["S&P 500", "Nasdaq 100", "Oro", "Bitcoin"] else "€"
         
         cuerpo.append(f"🔹 {cat.upper()} [{tipo}]")
@@ -297,25 +327,27 @@ def generar_resumen_completo(vix_val):
         cuerpo.append("")
         
     cuerpo.append(linea)
-    cuerpo.append("Informe generado a petición del usuario desde Radar DCA.")
+    cuerpo.append("Informe generado a petición del usuario desde Radar Tiburón Pro.")
     return "\n".join(cuerpo)
 
 # ==================== INTERFAZ ====================
 st.title("🦈 Radar DCA (Escáner de Mercado)")
-v = vix()
-st.caption(f"VIX actual: **{v:.2f}** | Radar puramente matemático y stateless.")
 
-with st.expander("📖 LEYENDAS Y MANUAL DE USO (Haz clic para leer)"):
+c_vix, c_btn = st.columns([3, 1])
+v = vix()
+with c_vix:
+    st.caption(f"VIX actual: **{v:.2f}** | Radar Cuantitativo Institucional.")
+with c_btn:
+    if st.button("🔄 Forzar Datos en Vivo"):
+        st.cache_data.clear()
+        st.rerun()
+
+with st.expander("📖 LEYENDAS Y MANUAL DE USO"):
     st.markdown("""
-    **ZONAS DE COMPRA (Basadas en el descuento)**
-    🟢 **ZONA 1:** Caída leve. Destina el **30%** de tu presupuesto.
-    🟠 **ZONA 2:** Sangre en las calles. Añade otro **30%**.
-    🔴 **ZONA 3:** Pánico absoluto. Vacía el cargador con el **40%**.
-    
-    **ZONAS DE VENTA (Basadas en la sobrecompra)**
-    🟡 **ZONA 1:** Euforia inicial. Vende un **20%** para recuperar liquidez.
-    🟠 **ZONA 2:** Sobrecalentamiento. Vende un **30%**.
-    🔴 **ZONA 3:** Burbuja técnica. Vende un **50%**.
+    **ZONAS DE COMPRA (Basadas en descuento 52w real, VIX y volumen/BOS):**
+    🟢 **ZONA 1:** Pullback inicial (-4% a -6%). Asignar **30%** de liquidez táctica.
+    🟠 **ZONA 2:** Descuento severo (-8% a -15% / -30% BTC). Añadir **30%** (Exige BOS 10d o VIX > 25).
+    🔴 **ZONA 3:** Capitulación institucional (-12% a -25% / -50% BTC). Vaciar el **40%** (Exige VIX >= 20 y Vol >= 0.85x).
     """)
 
 tab1, tab2, tab3, tab4 = st.tabs(["🎯 Señales", "🏛️ Rayos X Institucional", "📰 Diario (Teoría de Dow)", "🔔 Avisos"])
@@ -328,7 +360,7 @@ with tab1:
         d = datos(reglas["ticker"])
         if not d: continue
 
-        zona_c, dec_c, motivo_c = decidir_compra(d, reglas, v)
+        zona_c, dec_c, motivo_c = decidir_compra(d, reglas, v, reglas["ticker"])
         zona_v, dec_v, motivo_v = decidir_venta(d, reglas)
         
         fl_data = flujo(reglas["ticker"])
@@ -341,12 +373,12 @@ with tab1:
         badge_operativo = "⏱️ TRASPASO 5-15 días" if es_fondo else "⚡ INMEDIATO (segundos)"
         divisa = "$" if cat in ["S&P 500", "Nasdaq 100", "Oro", "Bitcoin"] else "€"
 
-        if dec_c == "BLOQUEADO": ic = "🛡️"
+        if dec_c.startswith("BLOQUEADO"): ic = "🛡️"
         elif zona_c > 0: ic = ["🟢", "🟠", "🔴"][zona_c - 1]
         elif zona_v > 0: ic = ["🟡", "🟠", "🔴"][zona_v - 1]
         else: ic = "⚪"
 
-        with st.expander(f"{ic} **{cat}** | {badge_operativo} | {dec_c} | {dec_v} | Estructura: {dow_txt}", expanded=(zona_c > 0 or zona_v > 0 or dec_c == "BLOQUEADO")):
+        with st.expander(f"{ic} **{cat}** | {badge_operativo} | {dec_c} | {dec_v} | Estructura: {dow_txt}", expanded=(zona_c > 0 or zona_v > 0 or dec_c.startswith("BLOQUEADO"))):
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Precio Real", f"{d['precio']:,.2f} {divisa}")
             c2.metric("Descuento (52w)", f"{d['caida']:.2%}")
@@ -355,71 +387,59 @@ with tab1:
             
             st.divider()
 
-            # --- GATILLO DE DESBLOQUEO ---
-            if dec_c == "BLOQUEADO":
-                vix_req = 13 if zona_c == 1 else (17 if zona_c == 2 else (22 if zona_c == 3 else 18))
-                p_gatillo = d['max_52w'] * 0.75
-                caida_req = ((d['precio'] - p_gatillo) / d['precio']) * 100 if d['precio'] > p_gatillo else 0.0
-                
-                st.warning(f"#### 🛡️ COMPRA BLOQUEADA: {motivo_c}")
-                st.markdown(f"""
-                **Gatillo de Desbloqueo (Zona {zona_c if zona_c > 0 else 'Base'}):**
-                1. VIX necesario: **{vix_req}**
-                2. Diferencia actual: **Faltan {(vix_req - v):.2f} puntos de VIX**
-                3. Precio gatillo (Capitulación total): **{p_gatillo:,.2f} {divisa}**
-                4. Caída adicional necesaria: **-{caida_req:.2f}%** desde el precio de hoy
-                5. **Tres escenarios de desbloqueo posibles:**
-                   - 🅰️ VIX sube al necesario manteniendo precio → *desbloqueo por pánico*
-                   - 🅱️ Precio cae al gatillo de capitulación con VIX actual → *desbloqueo por caída extrema*
-                   - 🅲 Activo recupera SMA200 con volumen → *reconsideración al alza*
-                """)
+            # --- GATILLO DE BLOQUEO O COMPRA ---
+            if dec_c.startswith("BLOQUEADO"):
+                if dec_c == "BLOQUEADO VOLUMEN":
+                    st.error(f"#### 🛡️ COMPRA BLOQUEADA POR FALTA DE VOLUMEN: {motivo_c}")
+                    st.info("El activo está en precio de compra, pero no hay compradores institucionales. Espera a que el volumen supere 0.85x su media de 20 días.")
+                elif dec_c == "BLOQUEADO BOS":
+                    st.warning(f"#### 🛡️ COMPRA BLOQUEADA POR ESTRUCTURA: {motivo_c}")
+                    st.info("Caída profunda sin suelo confirmado. Requiere superar el máximo de los últimos 10 días o VIX > 25.")
+                elif dec_c == "BLOQUEADO VIX":
+                    st.warning(f"#### 🛡️ COMPRA BLOQUEADA POR FALTA DE PÁNICO: {motivo_c}")
+                    st.info("Zona 3 reservada para capitulación real (VIX >= 20). No gastes tu munición pesada en distribuciones lentas.")
+                else:
+                    vix_req = 13 if d["caida"] > reglas["c2"] else (17 if d["caida"] > reglas["c3"] else 20)
+                    p_gatillo = d['max_52w'] * 0.75
+                    caida_req = ((d['precio'] - p_gatillo) / d['precio']) * 100 if d['precio'] > p_gatillo else 0.0
+                    
+                    st.warning(f"#### 🛡️ COMPRA BLOQUEADA: {motivo_c}")
+                    st.markdown(f"""
+                    **Gatillo de Desbloqueo:**
+                    1. VIX necesario: **{vix_req}** (Actual: {v:.1f})
+                    2. Precio gatillo (Capitulación total): **{p_gatillo:,.2f} {divisa}**
+                    3. Caída adicional necesaria: **-{caida_req:.2f}%**
+                    4. Escenarios: 🅰️ Sube VIX 🅱️ Cae al gatillo 🅲 Rompe estructura (BOS)
+                    """)
             
-            # --- VOLUMEN DE ENTRADA ---
             elif zona_c > 0:
                 st.success(f"#### {ic} {dec_c}: {motivo_c}")
-                ratio = evaluar_volumen(d['hist'])
-                if ratio > 1.3: vol_color, ratio_txt, vol_act = "🟢", "Volumen fuerte", "Ejecuta la compra completa ahora"
-                elif ratio >= 1.0: vol_color, ratio_txt, vol_act = "🟡", "Volumen normal", "Ejecuta el 100% (volumen normal aceptable)"
-                else: vol_color, ratio_txt, vol_act = "🔴", "Volumen débil", "Ejecuta el 50% ahora, el 50% esperando confirmación de volumen en 2-3 días"
+                ratio = evaluar_volumen(d['hist'], reglas["ticker"])
+                vol_color = "🟢" if ratio >= 1.0 else "🟡"
                 
                 st.markdown(f"""
-                **{vol_color} Filtro de Volumen de Entrada:**
-                - Ratio de volumen vs Media 20d: **{ratio:.2f}x** ({ratio_txt})
-                - 👉 **Sugerencia:** {vol_act}
+                **{vol_color} Filtro de Volumen Validado:**
+                - Ratio de volumen vs Media 20d: **{ratio:.2f}x**
+                - 👉 **Acción:** Ejecuta la orden correspondiente al tramo.
                 """)
                 
                 clave = f"{cat}_c{zona_c}"
                 if config_alertas.get("ultimas_alertas", {}).get(clave) != datetime.now().strftime("%Y-%m-%d"):
-                    alertas_hoy.append((cat, dec_c, f"Caída: {d['caida']:.2%}\nRatio vol: {ratio:.2f}x\n\nAcción sugerida: {vol_act}"))
+                    alertas_hoy.append((cat, dec_c, f"Caída: {d['caida']:.2%}\nRatio vol: {ratio:.2f}x"))
                     config_alertas.setdefault("ultimas_alertas", {})[clave] = datetime.now().strftime("%Y-%m-%d")
 
-            # --- AVISO DE ANTICIPACIÓN OPERATIVA ---
+            # --- AVISO PREVENTIVO PARA FONDOS ---
             if dec_c == "ESPERAR" and zona_c == 0:
                 umbral_z1 = reglas["c1"]
                 caida_actual = d["caida"]
                 caida_restante = abs(caida_actual - umbral_z1) * 100
                 
                 if es_fondo and caida_restante < 3:
-                    st.warning(f"""
-                    ⏱️ **AVISO DE ANTICIPACIÓN — FONDO (ejecución 5-15 días)**
-                    
-                    Estás a **{caida_restante:.2f}%** de activar la Zona 1.
-                    
-                    Como este activo es un fondo que tarda **5-15 días** en ejecutarse, debes preparar el traspaso con antelación. Si esperas a que salte la señal exacta, cuando se procese la orden el precio habrá cambiado.
-                    
-                    **Acción preventiva:** prepara la orden en MyInvestor ahora y ejecútala cuando veas la confirmación.
-                    """)
-                
-                if not es_fondo and caida_restante < 2:
-                    st.info(f"""
-                    ⚡ **PRÓXIMO A SEÑAL — ETF/ETP (ejecución inmediata)**
-                    
-                    Estás a **{caida_restante:.2f}%** de activar la Zona 1.
-                    
-                    Como es un ETF/ETP de ejecución instantánea, **puedes esperar a la señal exacta** sin riesgo operativo. Precio de ejecución = precio del momento.
-                    """)
+                    st.warning(f"⏱️ **AVISO DE ANTICIPACIÓN — FONDO (ejecución 5-15 días)**\n\nEstás a **{caida_restante:.2f}%** de activar la Zona 1. Prepara el traspaso con antelación.")
+                elif not es_fondo and caida_restante < 2:
+                    st.info(f"⚡ **PRÓXIMO A SEÑAL — ETF/ETP**\n\nEstás a **{caida_restante:.2f}%** de activar la Zona 1. Espera a la señal exacta.")
 
-            # --- ADX PARA VENTA ---
+            # --- VENTA ---
             if zona_v > 0:
                 st.warning(f"#### {['🟡', '🟠', '🔴'][zona_v-1]} {dec_v}: {motivo_v}")
                 df_adx = calcular_adx(d['hist'])
@@ -432,7 +452,7 @@ with tab1:
                     elif 25 <= adx_act <= 40 and (di_p < di_m and di_p_prev >= di_m_prev): adx_c, adx_txt = "🟡", "VENTA PARCIAL"
                     else: adx_c, adx_txt = "🔴", "SIN CONFIRMACIÓN (mantener)"
                     
-                    if es_fondo: msg_accion = "Inicia traspaso al monetario sin coste fiscal. Tiempo ejecución: 2-5 días intra-gestora, 8-15 días entre gestoras."
+                    if es_fondo: msg_accion = "Inicia traspaso al monetario sin coste fiscal."
                     else: msg_accion = "Vender implica tributar al 19-28%. Confirmar con 3 días de ADX bajando antes de ejecutar."
                     
                     st.markdown(f"""
@@ -446,15 +466,12 @@ with tab1:
                     if config_alertas.get("ultimas_alertas", {}).get(clave) != datetime.now().strftime("%Y-%m-%d"):
                         alertas_hoy.append((cat, dec_v, f"ADX: {adx_act:.1f} ({adx_txt})\n\nAcción sugerida: {msg_accion}"))
                         config_alertas.setdefault("ultimas_alertas", {})[clave] = datetime.now().strftime("%Y-%m-%d")
-            
-            if zona_c == 0 and zona_v == 0 and dec_c != "BLOQUEADO":
-                st.info(f"#### 💤 ESPERAR\nNo hay señales activas de entrada ni de salida.")
 
     if alertas_hoy:
         for cat, asunto, cuerpo in alertas_hoy:
             enviar_alerta(f"🦈 Radar: {cat} — {asunto}", cuerpo)
         guardar_json(F_ALERTAS, config_alertas)
-        st.success(f"📤 {len(alertas_hoy)} alertas enviadas")
+        st.success(f"📤 {len(alertas_hoy)} alertas enviadas.")
 
 with tab2:
     st.subheader("Rayos X Institucional")
@@ -462,11 +479,11 @@ with tab2:
         fl_data = flujo(reglas["ticker"])
         if not fl_data: continue
         ic = "🟢" if fl_data['score'] >= 2 else "⚪" if fl_data['score'] >= 0 else "🔴"
-        with st.expander(f"{ic} **{cat}** — Score Institucional Total: {fl_data['score']:+d}", expanded=True):
+        with st.expander(f"{ic} **{cat}** — Score Institucional: {fl_data['score']:+d}", expanded=True):
             c1, c2, c3 = st.columns(3)
-            c1.metric("1. Presión (OBV / Vol)", f"{fl_data['obv']:+.1%}", fl_data["obv_sig"])
-            c2.metric("2. Cierres (A/D / Vol)", f"{fl_data['ad']:+.1%}", fl_data["ad_sig"])
-            c3.metric("3. Precio Tiburón (VWAP)", f"{fl_data['vwap']:,.2f}", f"{fl_data['dist_vwap']:+.2f}%")
+            c1.metric("Presión (OBV / Vol)", f"{fl_data['obv']:+.1%}", fl_data["obv_sig"])
+            c2.metric("Cierres (A/D / Vol)", f"{fl_data['ad']:+.1%}", fl_data["ad_sig"])
+            c3.metric("Precio Tiburón (VWAP)", f"{fl_data['vwap']:,.2f}", f"{fl_data['dist_vwap']:+.2f}%")
 
 with tab3:
     st.subheader("📰 Diario: Teoría de Dow")
@@ -475,29 +492,20 @@ with tab3:
         if not d: continue
         dow = dow_theory(d["hist"])
         if not dow: continue
-        with st.expander(f"{dow['color']} **{cat}** — Tendencia {dow['trend']}", expanded=True):
-            st.markdown(f"**Estructura actual:** `{dow['det']}`")
+        with st.expander(f"{dow['color']} **{cat}** — {dow['trend']}", expanded=True):
             st.plotly_chart(grafico_dow(dow, cat), use_container_width=True)
 
 with tab4:
-    st.subheader("🔔 Configuración de Alertas por Correo")
-    
+    st.subheader("🔔 Configuración de Alertas")
     with st.form("alertas"):
         ea = st.checkbox("Activar Email", value=config_alertas.get("email_activo", False))
-        er = st.text_input("Tu Correo Remitente (Gmail)", value=config_alertas.get("email_remitente", ""))
-        ep = st.text_input("Contraseña de Aplicación de Google", value=config_alertas.get("email_password_app", ""), help="Puedes pegarla con o sin espacios; el sistema los eliminará automáticamente al guardar.")
+        er = st.text_input("Correo Remitente", value=config_alertas.get("email_remitente", ""))
+        ep = st.text_input("Contraseña de Aplicación", value=config_alertas.get("email_password_app", ""))
         ed = st.text_input("Correo Destino", value=config_alertas.get("email_destino", ""))
-        
         if st.form_submit_button("💾 Guardar Datos"):
-            ep_limpia = ep.replace(" ", "").strip()
-            config_alertas.update({
-                "email_activo": ea,
-                "email_remitente": er.strip(),
-                "email_password_app": ep_limpia,
-                "email_destino": ed.strip()
-            })
+            config_alertas.update({"email_activo": ea, "email_remitente": er.strip(), "email_password_app": ep.replace(" ","").strip(), "email_destino": ed.strip()})
             guardar_json(F_ALERTAS, config_alertas)
-            st.success("✅ Datos guardados correctamente. Espacios en contraseña eliminados.")
+            st.success("Guardado.")
             st.rerun()
 
     st.divider()
@@ -508,7 +516,7 @@ with tab4:
         with st.spinner("Compilando métricas y conectando con el servidor de correo..."):
             resumen = generar_resumen_completo(v)
             res = enviar_alerta(
-                f"🦈 Radar Tiburón: Informe de Mercado ({datetime.now().strftime('%d/%m/%Y')})",
+                f"🦈 Radar Tiburón Pro: Informe de Mercado ({datetime.now().strftime('%d/%m/%Y')})",
                 resumen,
                 forzar_email=True
             )
@@ -523,7 +531,7 @@ with tab4:
     if st.button("📨 Enviar ping de prueba"):
         with st.spinner("Comprobando conexión SMTP..."):
             res = enviar_alerta(
-                "🦈 Radar Tiburón: Prueba Técnica",
+                "🦈 Radar Tiburón Pro: Prueba Técnica",
                 f"¡Ping exitoso!\nFecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\nVIX actual: {v:.2f}",
                 forzar_email=True
             )
