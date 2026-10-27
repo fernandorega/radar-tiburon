@@ -365,7 +365,41 @@ with tab_senales:
             m5.metric("Estocástico (14w)", f"{d['stoch_k']:.1f}", "La Bonita" if d['la_bonita'] else "Neutro")
             
             st.markdown(f"**Vehículo:** `{reglas['vehiculo']}` en **{reglas['plataforma']}** (Asignación total: **{cap_posicion:,.0f} €**)")
+
+            # ==================== SEMÁFORO DCA (FILOSOFÍA CAVA) ====================
+            st.markdown("---")
+            st.markdown("#### 🚦 Semáforo DCA Mensual")
             
+            if d['stoch_k'] > 80:
+                color_dca = "🔴"
+                mensaje_dca = "SOBRECOMPRA EXTREMA. El estocástico semanal está por encima de 80. Si puedes, retrasa tu DCA unos días. Si no, haz tu aportación normal pero NO añadas dinero extra."
+                accion_dca = "ESPERAR / APORTACIÓN MÍNIMA"
+            elif d['la_bonita']:
+                color_dca = "🟢"
+                mensaje_dca = "¡LA BONITA! El estocástico ha girado al alza desde zona de sobreventa con el MACD alcista. Es el momento de mayor probabilidad. Adelanta tu DCA y añade un extra de tu pólvora de tramos."
+                accion_dca = "COMPRA CON LA BONITA (ADELANTAR + EXTRA)"
+            elif d['macd_alcista']:
+                color_dca = "🟡"
+                mensaje_dca = "MERCADO NEUTRO. El MACD está alcista pero el estocástico no ha dado señal de giro desde sobreventa. Ejecuta tu DCA mensual según tu calendario habitual."
+                accion_dca = "COMPRA NORMAL (CALENDARIO)"
+            else:
+                color_dca = "🔴"
+                mensaje_dca = "TENDENCIA MACRO BAJISTA. El MACD semanal no está alcista. No es momento de comprar con fuerza. Si tu calendario te obliga, haz tu DCA normal, pero NO añadas extra."
+                accion_dca = "ESPERAR / APORTACIÓN MÍNIMA"
+            
+            st.markdown(f"""
+            <div style="background-color: {'#1a472a' if color_dca == '🟢' else '#4a4a1a' if color_dca == '🟡' else '#4a1a1a'}; padding: 15px; border-radius: 10px; margin: 10px 0;">
+                <h4 style="margin: 0; color: {'#4ade80' if color_dca == '🟢' else '#facc15' if color_dca == '🟡' else '#f87171'};">
+                    {color_dca} {accion_dca}
+                </h4>
+                <p style="margin: 10px 0 0 0; color: #e5e7eb;">{mensaje_dca}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.caption(f"Estocástico %K: {d['stoch_k']:.1f} | %D: {d['stoch_d']:.1f} | MACD Alcista: {'Sí' if d['macd_alcista'] else 'No'} | La Bonita: {'Sí' if d['la_bonita'] else 'No'}")
+            st.markdown("---")
+            # ======================================================================
+
             # --- EVALUACIÓN DE COMPRA ---
             if estado_c == "ESPERAR":
                 st.info(f"⏳ **{motivo_c}**")
