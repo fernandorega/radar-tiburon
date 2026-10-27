@@ -15,16 +15,29 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos CSS de alto contraste y legibilidad institucional
+# Estilos CSS de diseño profesional de alto contraste
 st.markdown("""
 <style>
     .stAlert { border-radius: 8px; font-weight: 500; }
-    div[data-testid="stMetricValue"] { font-size: 1.45rem; font-weight: 700; }
-    .stProgress > div > div > div > div { background-color: #3b82f6; }
+    div[data-testid="stMetricValue"] { font-size: 1.40rem; font-weight: 700; }
+    .stProgress > div > div > div > div { background-color: #2563eb; }
+    .card-tactica {
+        background-color: #111827;
+        border: 1px solid #374151;
+        padding: 18px;
+        border-radius: 10px;
+        margin-bottom: 12px;
+    }
+    .card-dca {
+        padding: 16px;
+        border-radius: 10px;
+        margin-top: 15px;
+        border-left: 5px solid;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# ==================== RUTAS Y PERSISTENCIA ====================
+# ==================== RUTAS Y CONFIGURACIÓN ====================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if "__file__" in locals() else "."
 F_ALERTAS = os.path.join(BASE_DIR, "config_alertas_cava.json")
 
@@ -102,7 +115,7 @@ def get_vix_data():
         sma10 = float(h['Close'].tail(10).mean())
         tension = (v_act / sma10) - 1.0
         return {"actual": v_act, "sma10": sma10, "tension": tension}
-    except:
+    except Exception:
         return {"actual": 18.0, "sma10": 18.0, "tension": 0.0}
 
 @st.cache_data(ttl=300)
@@ -167,7 +180,7 @@ def get_market_data(ticker):
             "stoch_k": stoch_k, "stoch_d": stoch_d, "la_bonita": la_bonita,
             "bos": bos, "max_10d": max_10d, "vol_ratio": vol_ratio, "hist": h
         }
-    except Exception as e:
+    except Exception:
         return None
 
 # ==================== FLUJO INSTITUCIONAL (OBV, A/D, VWAP) ====================
@@ -206,7 +219,8 @@ def flujo_institucional(ticker):
             1 if p>sma200 else -1
         ])
         return {"score": score, "obv": obv_s, "obv_sig": obv_sig, "ad": ad_s, "ad_sig": ad_sig, "vwap": vwap, "dist_vwap": (p/vwap-1)*100, "p": p}
-    except: return None
+    except Exception:
+        return None
 
 # ==================== TEORÍA DE DOW ====================
 @st.cache_data(ttl=300)
@@ -225,7 +239,8 @@ def dow_theory(hist, order=5):
         elif close.iloc[m2] < close.iloc[m1] and close.iloc[n2] < close.iloc[n1]: trend, det, color = "BAJISTA", "Máximos y Mínimos Decrecientes", "🔴"
         else: trend, det, color = "LATERAL", "Estructura Mixta (Consolidación)", "⚪"
         return {"trend": trend, "det": det, "color": color, "close": close, "m1": m1, "m2": m2, "n1": n1, "n2": n2}
-    except: return None
+    except Exception:
+        return None
 
 def grafico_dow(dow, nombre):
     close = dow["close"]
@@ -295,12 +310,24 @@ def evaluar_motor_cava(d, reglas, v_info, ticker):
 def evaluar_venta_cava(d, reglas):
     ds = d["dist_sma"]
     rsi = d["rsi"]
+    es_spot = not reglas["es_fondo"]
+    
+    # Mensaje específico para Spot (Oro / Bitcoin) vs Fondos
+    if es_spot:
+        msg_z3 = "Extremo sobrecalentamiento macro. Vender del 50% al 80% de la posición a Euros / Efectivo para asegurar plusvalías históricas."
+        msg_z2 = "Fuerte tensión alcista. Recoger beneficios parciales vendiendo el 30% de la posición a cuenta de efectivo."
+        msg_z1 = "Tensión alcista en madurez. Frenar compras adicionales y vigilar divergencias de RSI."
+    else:
+        msg_z3 = "Extremo sobrecalentamiento. Traspasar entre 60% y 100% al Fondo Monetario (0 € peaje fiscal)."
+        msg_z2 = "Fuerte tensión alcista. Traspasar el 30% de la posición al Fondo Monetario (0 € peaje fiscal)."
+        msg_z1 = "Tensión alcista inicial. Frenar nuevas compras y vigilar soporte de medias."
+        
     if ds >= reglas["v3"] and rsi >= reglas["rsi_v3"]:
-        return 3, "VENTA ZONA 3 (RECOGIDA TOTAL)", "Extremo sobrecalentamiento. Traspasar entre 60% y 100% al Fondo Monetario."
+        return 3, "VENTA ZONA 3 (RECOGIDA TOTAL)", msg_z3
     if ds >= reglas["v2"] and rsi >= reglas["rsi_v2"]:
-        return 2, "VENTA ZONA 2 (RECOGIDA PARCIAL)", "Fuerte tensión alcista. Traspasar el 30% de la posición al Fondo Monetario."
+        return 2, "VENTA ZONA 2 (RECOGIDA PARCIAL)", msg_z2
     if ds >= reglas["v1"] and rsi >= reglas["rsi_v1"]:
-        return 1, "VENTA ZONA 1 (VIGILANCIA)", "Tensión alcista inicial. Frenar nuevas compras y vigilar soporte de medias."
+        return 1, "VENTA ZONA 1 (VIGILANCIA)", msg_z1
     return 0, "MANTENER", "Parámetros técnicos sanos. Mantener posición."
 
 # ==================== CABECERA PRINCIPAL ====================
@@ -366,40 +393,10 @@ with tab_senales:
             
             st.markdown(f"**Vehículo:** `{reglas['vehiculo']}` en **{reglas['plataforma']}** (Asignación total: **{cap_posicion:,.0f} €**)")
 
-            # ==================== SEMÁFORO DCA (FILOSOFÍA CAVA) ====================
+            # ==================== SECCIÓN 1: PÓLVORA TÁCTICA (TRAMOS DE CAPITAL) ====================
             st.markdown("---")
-            st.markdown("#### 🚦 Semáforo DCA Mensual")
+            st.markdown("#### 🎯 Despliegue Táctico por Tramos (Pólvora Pesada)")
             
-            if d['stoch_k'] > 80:
-                color_dca = "🔴"
-                mensaje_dca = "SOBRECOMPRA EXTREMA. El estocástico semanal está por encima de 80. Si puedes, retrasa tu DCA unos días. Si no, haz tu aportación normal pero NO añadas dinero extra."
-                accion_dca = "ESPERAR / APORTACIÓN MÍNIMA"
-            elif d['la_bonita']:
-                color_dca = "🟢"
-                mensaje_dca = "¡LA BONITA! El estocástico ha girado al alza desde zona de sobreventa con el MACD alcista. Es el momento de mayor probabilidad. Adelanta tu DCA y añade un extra de tu pólvora de tramos."
-                accion_dca = "COMPRA CON LA BONITA (ADELANTAR + EXTRA)"
-            elif d['macd_alcista']:
-                color_dca = "🟡"
-                mensaje_dca = "MERCADO NEUTRO. El MACD está alcista pero el estocástico no ha dado señal de giro desde sobreventa. Ejecuta tu DCA mensual según tu calendario habitual."
-                accion_dca = "COMPRA NORMAL (CALENDARIO)"
-            else:
-                color_dca = "🔴"
-                mensaje_dca = "TENDENCIA MACRO BAJISTA. El MACD semanal no está alcista. No es momento de comprar con fuerza. Si tu calendario te obliga, haz tu DCA normal, pero NO añadas extra."
-                accion_dca = "ESPERAR / APORTACIÓN MÍNIMA"
-            
-            st.markdown(f"""
-            <div style="background-color: {'#1a472a' if color_dca == '🟢' else '#4a4a1a' if color_dca == '🟡' else '#4a1a1a'}; padding: 15px; border-radius: 10px; margin: 10px 0;">
-                <h4 style="margin: 0; color: {'#4ade80' if color_dca == '🟢' else '#facc15' if color_dca == '🟡' else '#f87171'};">
-                    {color_dca} {accion_dca}
-                </h4>
-                <p style="margin: 10px 0 0 0; color: #e5e7eb;">{mensaje_dca}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.caption(f"Estocástico %K: {d['stoch_k']:.1f} | %D: {d['stoch_d']:.1f} | MACD Alcista: {'Sí' if d['macd_alcista'] else 'No'} | La Bonita: {'Sí' if d['la_bonita'] else 'No'}")
-            st.markdown("---")
-            # ======================================================================
-
             # --- EVALUACIÓN DE COMPRA ---
             if estado_c == "ESPERAR":
                 st.info(f"⏳ **{motivo_c}**")
@@ -422,9 +419,68 @@ with tab_senales:
                 if reglas["es_fondo"]:
                     st.markdown("👉 **Acción Recomendada:** Ordenar **traspaso hacia el Fondo Monetario** (`FR0001028830`) en MyInvestor para blindar plusvalías con 0 € de IRPF.")
                 else:
-                    st.markdown("👉 **Acción Recomendada:** Venta parcial a cuenta de efectivo. Ten en cuenta que tributa al 19% en la base del ahorro.")
+                    st.markdown(f"""
+                    👉 **Acción Recomendada ({nombre}):** En activos al contado (Spot), **se recogen beneficios vendiendo a cuenta de efectivo** (o stablecoin respaldada en euros).
+                    - **¿Por qué NO stop loss aquí?:** Un stop loss automático en exchange es barrido por mechas de volatilidad y te obliga a tributar por FIFO. La toma de beneficios se ejecuta en tramos cuando el radar alcanza estas zonas de sobreextensión.
+                    - **Impacto Fiscal:** Plusvalía tributa en la base del ahorro (19% a 28%).
+                    """)
 
             st.caption(f"Estructura Táctica: Tramo 1 (30%): {tramo_1:,.0f} € | Tramo 2 (30%): {tramo_2:,.0f} € | Tramo 3 (40%): {tramo_3:,.0f} €")
+
+            # ==================== SECCIÓN 2: SEMÁFORO DCA MENSUAL (AHORRO PERIÓDICO) ====================
+            st.markdown("---")
+            st.markdown("#### 🚦 Semáforo DCA Mensual (Ahorro Periódico Sistemático)")
+            
+            if d['stoch_k'] > 80:
+                color_dca = "🔴"
+                border_color = "#ef4444"
+                bg_color = "#371515"
+                text_color = "#f87171"
+                accion_dca = "APORTACIÓN MÍNIMA DE CALENDARIO (SIN EXTRAS)"
+                mensaje_dca = "SOBRECOMPRA EXTREMA (%K > 80). Si tu disciplina exige aportar este mes, haz tu cuota normal fija de calendario, pero queda TERMINANTEMENTE PROHIBIDO gastar pólvora extra o adelantar aportaciones. El mercado está extendido."
+            elif d['la_bonita']:
+                color_dca = "🟢"
+                border_color = "#22c55e"
+                bg_color = "#143320"
+                text_color = "#4ade80"
+                accion_dca = "¡LA BONITA CONFIRMADA! (ADELANTAR DCA + TRAMO EXTRA)"
+                mensaje_dca = "MÁXIMA PROBABILIDAD ESTADÍSTICA (Cava, Cap. V). El estocástico semanal ha cortado al alza saliendo de sobreventa con la tendencia de fondo alcista. Adelanta la aportación mensual e inyecta un tramo extra de munición."
+            elif d['macd_alcista']:
+                color_dca = "🟡"
+                border_color = "#eab308"
+                bg_color = "#332b14"
+                text_color = "#facc15"
+                accion_dca = "APORTACIÓN NORMAL DE CALENDARIO"
+                mensaje_dca = "TENDENCIA MACRO ALCISTA SANA. El MACD semanal acompaña sin sobrecompra extrema. Ejecuta tu DCA mensual habitual sin modificar importes."
+            else:
+                color_dca = "🔴"
+                border_color = "#f97316"
+                bg_color = "#351e12"
+                text_color = "#fb923c"
+                accion_dca = "APORTACIÓN MÍNIMA (PRUDENCIA MACRO)"
+                mensaje_dca = "TENDENCIA MACRO EN FASE CORRECTIVA. El MACD semanal no confirma impulso alcista. Realiza solo la aportación fija si tu sistema es automático, pero no comprometas reservas de liquidez."
+            
+            st.markdown(f"""
+            <div class="card-dca" style="background-color: {bg_color}; border-color: {border_color};">
+                <div style="font-weight: 700; font-size: 1.05rem; color: {text_color}; margin-bottom: 6px;">
+                    {color_dca} {accion_dca}
+                </div>
+                <div style="color: #e5e7eb; font-size: 0.95rem; line-height: 1.45;">
+                    {mensaje_dca}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # ==================== AVISOS DE DISCIPLINA OPERATIVA CAVA ====================
+            # 1. Recordatorio para Fondos Indexados (MyInvestor T+2)
+            if color_dca == "🟢" and reglas["es_fondo"]:
+                st.warning("⏱️ **RECORDATORIO OPERATIVO (FONDOS T+2):** Has recibido la señal de 'La Bonita'. Ordena el traspaso desde el Monetario (`FR0001028830`). Recuerda que la orden se liquidará a D+1 o D+2. **No canceles la orden si el precio oscila**, estás comprando valor con diferimiento fiscal (Art. 94 LIRPF).")
+            
+            # 2. Recordatorio para Activos Spot (Oro / Bitcoin)
+            if color_dca == "🟢" and not reglas["es_fondo"]:
+                st.info(f"🛡️ **GESTIÓN DE RIESGO PATRIMONIAL ({nombre.upper()}):** En activos Spot (Trade Republic / MyInvestor) **NO se colocan Stop Loss automáticos**. Tu seguridad es el dimensionamiento ({reglas['peso']:.0%} de cartera = {cap_posicion:,.0f} €) y entrar en tramos (30%/30%/40%). La salida se realiza exclusivamente cuando el radar marque Venta Zona 2 o 3 por sobreextensión.")
+
+            st.caption(f"Lecturas de Soporte DCA: Estocástico %K: {d['stoch_k']:.1f} | %D: {d['stoch_d']:.1f} | MACD Alcista: {'Sí' if d['macd_alcista'] else 'No'} | Pauta Bonita: {'Sí' if d['la_bonita'] else 'No'}")
 
 # ==================== PESTAÑA 2: RAYOS X INSTITUCIONAL ====================
 with tab_flujo:
@@ -468,11 +524,13 @@ with tab_guia:
        - **Tramo 2 (30%):** En el soporte mayor de la media de 200 sesiones (Zona 2).
        - **Tramo 3 (40%):** En capitulaciones con pánico extremo o roturas de suelo con gran volumen.
        
-    3. **Cero Stop Loss en Fondos Indexados:**
-       - No pongas órdenes de stop que malvendan tus fondos indexados en pánico. 
-       - Tu stop loss es la asignación de activos: 10.000 € en colchón fuera, 15.000 € en monetario puente y entrar solo con tramos pequeños.
+    3. **¿Stop Loss en Bitcoin y Oro Spot? NUNCA:**
+       - Colocar un stop automático en el exchange/broker regala tus participaciones a los creadores de mercado en barridas de volatilidad y te fuerza a tributar en el IRPF (19%-28%).
+       - Tu stop loss es el **dimensionamiento patrimonial**: 5% en Bitcoin (3.000 €) y 15% en Oro (9.000 €), respaldados por 10.000 € en colchón y 15.000 € en monetario.
        
-    4. **El Diferimiento Fiscal del Art. 94 LIRPF en España:**
-       - Cuando el mercado se sobrecalienta (Venta Zona 2 o 3), nunca vendas a cuenta corriente.
-       - Traspasa del fondo indexado al Fondo Monetario (`FR0001028830`). Tus ganancias quedan protegidas y el interés compuesto sigue trabajando con 0 € de tributación inmediata.
+    4. **Toma de Beneficios en Techos (Zonas de Venta 2 y 3):**
+       - Cuando Bitcoin o el Oro se distancian más de un 65%-100% de su media de 200 sesiones y el RSI supera 80, el radar activa la venta parcial. Ahí se recorta la posición y se pasa el beneficio a efectivo remunerado o al monetario.
+       
+    5. **El Diferimiento Fiscal del Art. 94 LIRPF en España:**
+       - Para el S&P 500 y Nasdaq 100, la recogida de beneficios se hace vía **traspaso interno al Fondo Monetario** (`FR0001028830`). Tus ganancias quedan protegidas y el interés compuesto sigue trabajando con 0 € de tributación inmediata.
     """)
