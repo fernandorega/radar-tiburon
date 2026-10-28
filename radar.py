@@ -271,41 +271,77 @@ def grafico_dow(dow, nombre):
     return fig
 
 # ==================== MOTOR DE DECISIÓN CAVA (COMPRA Y VENTA) ====================
-def evaluar_motor_cava(d, reglas, v_info, ticker):
+def evaluar_motor_cava(d, reglas, v_info, ticker, cap_posicion):
     caida = d["caida"]
     v_act = v_info["actual"]
     v_tension = v_info["tension"]
     
-    # 1. Determinar Zona Teórica por Caída
-    if caida <= reglas["c3"]: zona_teorica = 3
-    elif caida <= reglas["c2"]: zona_teorica = 2
-    elif caida <= reglas["c1"]: zona_teorica = 1
-    else: zona_teorica = 0
-    
-    # Si no hay descuento suficiente
-    if zona_teorica == 0:
-        dist_z1 = abs(caida - reglas["c1"])
-        precio_z1 = d["max52"] * (1.0 + reglas["c1"])
-        caida_dolares = d["precio"] - precio_z1
-        return 0, "ESPERAR", f"Falta caída. Descuento actual: {caida:.2%}. A {dist_z1:.2%} de Zona 1 ({caida_dolares:,.2f} $)", dist_z1, precio_z1
-    
+    c1, c2, c3 = reglas["c1"], reglas["c2"], reglas["c3"]
+    t1_eur = cap_posicion * 0.30
+    t2_eur = cap_posicion * 0.30
+    t3_eur = cap_posicion * 0.40
+
+    # 1. Determinar en qué Zona de Descuento nos encontramos
+    if caida <= c3:
+        zona_actual = 3
+        tramo_actual_nom = "Tramo 3 (40%)"
+        tramo_actual_eur = t3_eur
+        target_zona = 3
+        target_eur = t3_eur
+        dist_target = 0.0
+        precio_target = d["max52"] * (1.0 + c3)
+    elif caida <= c2:
+        zona_actual = 2
+        tramo_actual_nom = "Tramo 2 (30%)"
+        tramo_actual_eur = t2_eur
+        target_zona = 2
+        target_eur = t2_eur
+        dist_target = 0.0
+        precio_target = d["max52"] * (1.0 + c2)
+    elif caida <= c1:
+        zona_actual = 1
+        tramo_actual_nom = "Tramo 1 (30%)"
+        tramo_actual_eur = t1_eur
+        target_zona = 1
+        target_eur = t1_eur
+        dist_target = 0.0
+        precio_target = d["max52"] * (1.0 + c1)
+    else:
+        zona_actual = 0
+        target_zona = 1
+        target_eur = t1_eur
+        dist_target = abs(caida - c1)
+        precio_target = d["max52"] * (1.0 + c1)
+        caida_pts = d["precio"] - precio_target
+        motivo = (f"Esperando ZONA 1 — Tramo 1 (30%): `{t1_eur:,.0f} €`. "
+                  f"Falta un {dist_target:.2%} de retroceso (Gatillo: {precio_target:,.2f} $ | Faltan {caida_pts:,.2f} $)")
+        return 0, "ESPERAR", motivo, dist_target, precio_target, target_zona, target_eur
+
     # 2. Filtro Anti-Cuchillo VIX Dinámico (Cava, pág. 61)
     if abs(caida) >= 0.25 and (v_act < 20.0 and v_tension < 0.10):
-        return 0, "BLOQUEADO VIX", f"Caída profunda (-{abs(caida):.1%}) sin pánico real. VIX {v_act:.1f} < 20 y tensión {v_tension:+.1%}.", 0, 0
-    
+        motivo = (f"En ZONA {zona_actual} ({tramo_actual_nom}: `{tramo_actual_eur:,.0f} €`) pero BLOQUEADO VIX. "
+                  f"Caída del {caida:.1%} sin pánico institucional (VIX actual: {v_act:.1f} < 20 y tensión {v_tension:+.1%}).")
+        return 0, "BLOQUEADO VIX", motivo, 0.0, 0.0, zona_actual, tramo_actual_eur
+
     # 3. Filtro BOS (Quiebre de Estructura de Suelo de Cava)
-    if zona_teorica >= 2 and not d["bos"] and v_act < 25.0:
+    if zona_actual >= 2 and not d["bos"] and v_act < 25.0:
         p_bos = d["max_10d"]
         dist_bos = ((p_bos - d["precio"]) / d["precio"]) * 100.0
-        return 0, "BLOQUEADO BOS", f"En soporte pero sin confirmación de giro. Requiere superar {p_bos:,.2f} $ (+{dist_bos:.1f}%) o VIX > 25.", 0, p_bos
-        
-    # 4. Filtro de Volumen Institucional (No synthetic)
+        motivo = (f"En ZONA {zona_actual} ({tramo_actual_nom}: `{tramo_actual_eur:,.0f} €`) pero BLOQUEADO BOS. "
+                  f"Requiere quiebre de suelo superando {p_bos:,.2f} $ (+{dist_bos:.1f}%) o VIX > 25.")
+        return 0, "BLOQUEADO BOS", motivo, 0.0, p_bos, zona_actual, tramo_actual_eur
+
+    # 4. Filtro de Volumen Institucional
     if not ticker.startswith("^") and d["vol_ratio"] < 0.85:
-        return 0, "BLOQUEADO VOLUMEN", f"Volumen institucional débil ({d['vol_ratio']:.2f}x < 0.85x). Sin absorción.", 0, 0
+        motivo = (f"En ZONA {zona_actual} ({tramo_actual_nom}: `{tramo_actual_eur:,.0f} €`) pero BLOQUEADO VOLUMEN. "
+                  f"Volumen débil ({d['vol_ratio']:.2f}x < 0.85x). Sin absorción.")
+        return 0, "BLOQUEADO VOLUMEN", motivo, 0.0, 0.0, zona_actual, tramo_actual_eur
 
     # 5. Señal de Entrada Validada
     pauta_txt = " (PAUTA BONITA CAVA)" if d["la_bonita"] else ""
-    return zona_teorica, f"COMPRAR ZONA {zona_teorica}{pauta_txt}", f"Caída {caida:.2%}, VIX {v_act:.1f}, Vol {d['vol_ratio']:.2f}x. Condiciones alineadas.", 0, 0
+    motivo = (f"¡GATILLO ACTIVADO! Ejecutar ZONA {zona_actual}{pauta_txt} — {tramo_actual_nom}: `{tramo_actual_eur:,.0f} €`. "
+              f"Descuento {caida:.2%} validado con estructura y volatilidad.")
+    return zona_actual, f"COMPRAR ZONA {zona_actual}{pauta_txt}", motivo, 0.0, 0.0, zona_actual, tramo_actual_eur
 
 def evaluar_venta_cava(d, reglas):
     ds = d["dist_sma"]
@@ -368,13 +404,15 @@ with tab_senales:
             st.error(f"Error conectando con los datos de {nombre}")
             continue
             
-        zona_c, estado_c, motivo_c, dist_z1, precio_z1 = evaluar_motor_cava(d, reglas, v_info, reglas["ticker"])
-        zona_v, estado_v, motivo_v = evaluar_venta_cava(d, reglas)
-        
         cap_posicion = CAPITAL_RADAR * reglas["peso"]
         tramo_1 = cap_posicion * 0.30
         tramo_2 = cap_posicion * 0.30
         tramo_3 = cap_posicion * 0.40
+
+        zona_c, estado_c, motivo_c, dist_target, precio_target, target_zona, target_eur = evaluar_motor_cava(
+            d, reglas, v_info, reglas["ticker"], cap_posicion
+        )
+        zona_v, estado_v, motivo_v = evaluar_venta_cava(d, reglas)
         
         if "COMPRAR" in estado_c: icon_c = "🟢"
         elif "BLOQUEADO" in estado_c: icon_c = "🛡️"
@@ -395,22 +433,26 @@ with tab_senales:
 
             # ==================== SECCIÓN 1: PÓLVORA TÁCTICA (TRAMOS DE CAPITAL) ====================
             st.markdown("---")
-            st.markdown("#### 🎯 Despliegue Táctico por Tramos (Pólvora Pesada)")
+            st.markdown(f"#### 🎯 Despliegue Táctico por Tramos — {nombre}")
             
             # --- EVALUACIÓN DE COMPRA ---
             if estado_c == "ESPERAR":
                 st.info(f"⏳ **{motivo_c}**")
-                progreso = max(0.0, min(1.0, 1.0 - (dist_z1 / abs(reglas['c1']))))
-                st.progress(progreso, text=f"Proximidad a Zona 1: Falta {dist_z1:.2%} de retroceso para entrar a {precio_z1:,.2f} $")
+                progreso = max(0.0, min(1.0, 1.0 - (dist_target / abs(reglas['c1']))))
+                st.progress(progreso, text=f"Proximidad a ZONA {target_zona} (Tramo {target_zona} = {target_eur:,.0f} €): Falta un {dist_target:.2%}")
             elif "BLOQUEADO" in estado_c:
                 st.warning(f"#### 🛡️ {estado_c}\n{motivo_c}")
-                st.info("El algoritmo te protege de atrapar un cuchillo en caída libre. No hay compras hasta confirmación.")
+                st.markdown(f"""
+                - **Tramo Táctico Retenido:** `{target_eur:,.0f} €` asignados a **Zona {target_zona}**.
+                - **Protocolo Cava:** La munición permanece en el Fondo Monetario o cuenta remunerada hasta que el VIX supere 20 o se confirme quiebre de estructura (BOS).
+                """)
             elif "COMPRAR" in estado_c:
                 st.success(f"#### 🎯 {estado_c}\n{motivo_c}")
                 st.markdown(f"""
-                - **Tramo a Ejecutar:** `{tramo_1:,.0f} €` (Tramo 1 = 30% del bloque)
-                - **Procedimiento de Traspaso:** Si estás en MyInvestor, traspasa desde el Fondo Monetario (`FR0001028830`).
-                - **Munición en Reserva:** Conserva `{cap_posicion - tramo_1:,.0f} €` en liquidez para Zona 2 y 3.
+                - **Tramo a Ejecutar AHORA:** `{target_eur:,.0f} €` (Zona {target_zona})
+                - **Vehículo de Destino:** `{reglas['vehiculo']}` en **{reglas['plataforma']}**
+                - **Procedimiento:** Si es fondo (MyInvestor), ordenar traspaso desde el Monetario (`FR0001028830`). Si es spot (Trade Republic), comprar a mercado.
+                - **Munición Restante en Reserva:** `{cap_posicion - target_eur:,.0f} €` para siguientes tramos.
                 """)
                 
             # --- EVALUACIÓN DE VENTA / TRASPASO AL MONETARIO ---
@@ -425,7 +467,7 @@ with tab_senales:
                     - **Impacto Fiscal:** Plusvalía tributa en la base del ahorro (19% a 28%).
                     """)
 
-            st.caption(f"Estructura Táctica: Tramo 1 (30%): {tramo_1:,.0f} € | Tramo 2 (30%): {tramo_2:,.0f} € | Tramo 3 (40%): {tramo_3:,.0f} €")
+            st.caption(f"Estructura Táctica de Tramos: Tramo 1 (30%): {tramo_1:,.0f} € | Tramo 2 (30%): {tramo_2:,.0f} € | Tramo 3 (40%): {tramo_3:,.0f} €")
 
             # ==================== SECCIÓN 2: SEMÁFORO DCA MENSUAL (AHORRO PERIÓDICO) ====================
             st.markdown("---")
