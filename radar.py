@@ -34,6 +34,22 @@ st.markdown("""
         margin-top: 15px;
         border-left: 5px solid;
     }
+    .badge-corte-ok {
+        background-color: #065f46;
+        color: #6ee7b7;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.85rem;
+    }
+    .badge-corte-tarde {
+        background-color: #7c2d12;
+        color: #fdba74;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.85rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -62,34 +78,215 @@ config_alertas = cargar_json(F_ALERTAS, {
 # ==================== CARTERA CAVA PATRIMONIAL (60.000 € + 10.000 € RESERVA) ====================
 CAPITAL_RADAR = 60000
 COLCHON_EMERGENCIAS = 10000
+ISIN_MONETARIO_NODRIZA = "FR0000447823"
+NOMBRE_MONETARIO_NODRIZA = "AXA Trésor Court Terme C (FR0000447823)"
 
 ASIGNACION = {
     "S&P 500 (Core)": {
-        "ticker": "^GSPC", "peso": 0.40, "vehiculo": "Fondo Indexado Fidelity (IE00BYX5MX10)",
+        "ticker": "^GSPC", "peso": 0.40, "vehiculo": "Fidelity S&P 500 Index P EUR Acc (IE00BYX5MX67)",
+        "isin": "IE00BYX5MX67", "hora_corte": 16, "ter": 0.0006,
         "plataforma": "MyInvestor", "es_fondo": True,
         "c1": -0.04, "c2": -0.10, "c3": -0.20,
         "v1": 0.15, "v2": 0.25, "v3": 0.35, "rsi_v1": 70, "rsi_v2": 75, "rsi_v3": 80
     },
     "Nasdaq 100 (Satélite)": {
-        "ticker": "^NDX", "peso": 0.15, "vehiculo": "Fondo MyInvestor Nasdaq 100 (ES0165265002)",
+        "ticker": "^NDX", "peso": 0.15, "vehiculo": "MyInvestor Nasdaq 100 FI (ES0165265002)",
+        "isin": "ES0165265002", "hora_corte": 12, "ter": 0.0038,
         "plataforma": "MyInvestor", "es_fondo": True,
         "c1": -0.06, "c2": -0.15, "c3": -0.25,
         "v1": 0.18, "v2": 0.30, "v3": 0.45, "rsi_v1": 70, "rsi_v2": 75, "rsi_v3": 80
     },
     "Oro Físico (Refugio)": {
-        "ticker": "GC=F", "peso": 0.15, "vehiculo": "ETC iShares Physical Gold (IE00B4ND3602) / Monedas",
-        "plataforma": "MyInvestor / Físico", "es_fondo": False,
+        "ticker": "GC=F", "peso": 0.15, "vehiculo": "ETC iShares Physical Gold (IE00B4ND3602) — 0,12% TER todo incluido",
+        "isin": "IE00B4ND3602", "hora_corte": 17, "ter": 0.0012,
+        "plataforma": "MyInvestor / Trade Republic", "es_fondo": False,
         "c1": -0.05, "c2": -0.10, "c3": -0.18,
         "v1": 0.15, "v2": 0.25, "v3": 0.35, "rsi_v1": 70, "rsi_v2": 75, "rsi_v3": 80
     },
     "Bitcoin (Asimetría)": {
         "ticker": "BTC-USD", "peso": 0.05, "vehiculo": "Spot Cripto 24/7",
+        "isin": "BTC-USD", "hora_corte": 24, "ter": 0.0000,
         "plataforma": "Trade Republic", "es_fondo": False,
         "c1": -0.15, "c2": -0.30, "c3": -0.50,
         "v1": 0.35, "v2": 0.65, "v3": 1.00, "rsi_v1": 75, "rsi_v2": 80, "rsi_v3": 85
     }
 }
-LIQUIDEZ_MONETARIO_PESO = 0.25 # 15.000 € en Fondo Monetario Puente
+LIQUIDEZ_MONETARIO_PESO = 0.25  # 15.000 € en AXA Trésor Court Terme C (FR0000447823)
+
+# ==================== CATÁLOGO MAESTRO DE 9 FONDOS MYINVESTOR AUDITADOS ====================
+CATALOGO_FONDOS_MY = [
+    {
+        "bloque": "Búnker / Pólvora Seca",
+        "nombre": "AXA Trésor Court Terme C",
+        "isin": "FR0000447823",
+        "hora_corte": 10,
+        "ter": "0,05%",
+        "ter_num": 0.0005,
+        "r_2026": "+1,67%",
+        "r_1a": "+2,25%",
+        "r_3a": "+2,95%",
+        "r_5a": "+2,28%",
+        "vol_3a": "0,25%",
+        "sharpe_3a": 3.74,
+        "rating": "Monetario (€STR)",
+        "top_holdings": "Deuda soberana Francia/España y depósitos €STR (< 60 días)",
+        "rol_radar": "Base nodriza. Custodia la liquidez con 0% volatilidad y financia los tramos sin peaje fiscal.",
+        "estado_calidad": "🟢 BÚNKER NODRIZA",
+        "ticker_proxy": "^IRX"
+    },
+    {
+        "bloque": "Core USA (Crecimiento)",
+        "nombre": "Fidelity S&P 500 Index P EUR Acc",
+        "isin": "IE00BYX5MX67",
+        "hora_corte": 16,
+        "ter": "0,06%",
+        "ter_num": 0.0006,
+        "r_2026": "+16,24%",
+        "r_1a": "+17,99%",
+        "r_3a": "+22,17%",
+        "r_5a": "+12,79%",
+        "vol_3a": "12,84%",
+        "sharpe_3a": 1.25,
+        "rating": "★★★★",
+        "top_holdings": "NVIDIA (7,7%), Apple (7,6%), Microsoft (5,9%), Amazon (3,6%), Alphabet",
+        "rol_radar": "Motor principal de Wall Street. Recibe tramos en soportes clave y ahorro sistemático (DCA).",
+        "estado_calidad": "🟢 CORE IMBATIBLE",
+        "ticker_proxy": "^GSPC"
+    },
+    {
+        "bloque": "Diversificación Core",
+        "nombre": "Fidelity MSCI World Index P EUR Acc",
+        "isin": "IE00BYX5NX33",
+        "hora_corte": 16,
+        "ter": "0,12%",
+        "ter_num": 0.0012,
+        "r_2026": "+15,54%",
+        "r_1a": "+17,91%",
+        "r_3a": "+21,17%",
+        "r_5a": "+11,61%",
+        "vol_3a": "11,43%",
+        "sharpe_3a": 1.31,
+        "rating": "★★★★",
+        "top_holdings": "72,9% EE. UU., 15,3% Europa, 5,7% Japón, 3,4% Canadá (1.247 valores)",
+        "rol_radar": "Mayor Ratio Sharpe (1,31). Reduce concentración en EE. UU. incorporando Europa, Japón y Canadá.",
+        "estado_calidad": "🟢 MÁXIMO SHARPE",
+        "ticker_proxy": "URTH"
+    },
+    {
+        "bloque": "Satélite Tech (IA)",
+        "nombre": "MyInvestor Nasdaq 100 FI",
+        "isin": "ES0165265002",
+        "hora_corte": 12,
+        "ter": "0,38% (0,45% GC)",
+        "ter_num": 0.0038,
+        "r_2026": "+23,88%",
+        "r_1a": "+19,53%",
+        "r_3a": "+24,86%",
+        "r_5a": "+10,31%",
+        "vol_3a": "18,85%",
+        "sharpe_3a": 1.09,
+        "rating": "★★★",
+        "top_holdings": "Réplica Nasdaq 100 Net Total Return EUR (60% Tecnología, 13% Comunicación)",
+        "rol_radar": "Vehículo para disparar los tramos de Zona 1 y Zona 2 de sobreventa tecnológica sin pasar por Hacienda.",
+        "estado_calidad": "🟢 SATÉLITE TÁCTICO",
+        "ticker_proxy": "^NDX"
+    },
+    {
+        "bloque": "Refugio Europa Low-Cost",
+        "nombre": "iShares Europe Equity Index A2 EUR",
+        "isin": "LU0836512706",
+        "hora_corte": 10,
+        "ter": "0,12% (0,54% GC)",
+        "ter_num": 0.0012,
+        "r_2026": "+10,26%",
+        "r_1a": "+16,13%",
+        "r_3a": "+17,16%",
+        "r_5a": "+9,30%",
+        "vol_3a": "10,70%",
+        "sharpe_3a": 1.06,
+        "rating": "★★★★",
+        "top_holdings": "ASML (5,1%), HSBC (2,5%), Roche (2,1%), Shell (2,0%), Novartis (1,9%), AstraZeneca, Nestlé",
+        "rol_radar": "Rotación defensiva cuando el flujo institucional abandona múltiplos caros de IA buscando Pharma + Consumo.",
+        "estado_calidad": "🟢 REFUGIO DEFENSIVO",
+        "ticker_proxy": "VGK"
+    },
+    {
+        "bloque": "Refugio Salud / Pharma USA",
+        "nombre": "Wellington Global Health Care D EUR Acc",
+        "isin": "IE00BF2ZVB54",
+        "hora_corte": 12,
+        "ter": "1,74%",
+        "ter_num": 0.0174,
+        "r_2026": "+9,81%",
+        "r_1a": "+28,44%",
+        "r_3a": "+12,08%",
+        "r_5a": "+4,26%",
+        "vol_3a": "14,77%",
+        "sharpe_3a": 0.36,
+        "rating": "★★★",
+        "top_holdings": "80,2% EE. UU.: Eli Lilly (9,3%), Merck (5,5%), J&J (5,0%), AstraZeneca (4,0%), UnitedHealth, AbbVie",
+        "rol_radar": "Refugio de farmacia estadounidense (tesis Cava) y biotecnología para rotación defensiva acotada (5%-10%).",
+        "estado_calidad": "🟡 TÁCTICO SALUD USA",
+        "ticker_proxy": "XLV"
+    },
+    {
+        "bloque": "Refugio Energía / Inflación",
+        "nombre": "Guinness Global Energy D EUR Acc",
+        "isin": "IE00B3CCJB88",
+        "hora_corte": 14,
+        "ter": "1,27%",
+        "ter_num": 0.0127,
+        "r_2026": "+42,98%",
+        "r_1a": "+60,63%",
+        "r_3a": "+17,17%",
+        "r_5a": "+18,17%",
+        "vol_3a": "20,60%",
+        "sharpe_3a": 0.52,
+        "rating": "★★",
+        "top_holdings": "ExxonMobil (5,3%), Chevron (4,7%), Shell (4,7%), Valero (4,7%), BP (4,5%), TotalEnergies",
+        "rol_radar": "Cobertura táctica ante shocks de oferta de petróleo, gas y tensiones geopolíticas que drenen liquidez.",
+        "estado_calidad": "🟡 TÁCTICO ENERGÍA",
+        "ticker_proxy": "XLE"
+    },
+    {
+        "bloque": "Refugio Anticrisis (Duración)",
+        "nombre": "Vanguard Global Bond Index EUR Hedged",
+        "isin": "IE00B18GC888",
+        "hora_corte": 12,
+        "ter": "0,15%",
+        "ter_num": 0.0015,
+        "r_2026": "-3,38%",
+        "r_1a": "-2,47%",
+        "r_3a": "+2,78%",
+        "r_5a": "-1,99%",
+        "vol_3a": "4,50%",
+        "sharpe_3a": -0.15,
+        "rating": "★★★",
+        "top_holdings": "16.967 bonos globales (64% Gubernamental, 24% Corporativo). Duración efectiva: 5,99 años",
+        "rol_radar": "Seguro de recesión deflacionaria: solo se activa cuando los bancos centrales recortan tipos agresivamente.",
+        "estado_calidad": "⚪ SOLO EN RECESIÓN",
+        "ticker_proxy": "BND"
+    },
+    {
+        "bloque": "Refugio Cadena Alimentaria",
+        "nombre": "Pictet - Nutrition P EUR",
+        "isin": "LU0366534344",
+        "hora_corte": 12,
+        "ter": "2,01%",
+        "ter_num": 0.0201,
+        "r_2026": "+5,72%",
+        "r_1a": "+8,14%",
+        "r_3a": "+2,77%",
+        "r_5a": "-4,31%",
+        "vol_3a": "12,07%",
+        "sharpe_3a": -0.23,
+        "rating": "★★",
+        "top_holdings": "Deere & Co (7,4%), Ecolab (4,6%), Novonesis (4,5%), Danone (4,3%), Thermo Fisher",
+        "rol_radar": "Cadena agroalimentaria. Penalizado por su TER del 2,01% (Sharpe -0,23); preferible cubrir consumo vía iShares Europe.",
+        "estado_calidad": "🔴 EVITAR POR TER (2,01%)",
+        "ticker_proxy": "XLP"
+    }
+]
 
 # ==================== MACRO Y ESTACIONALIDAD (DOCTRINA CAVA) ====================
 def get_ciclo_presidencial():
@@ -354,8 +551,8 @@ def evaluar_venta_cava(d, reglas):
         msg_z2 = "Fuerte tensión alcista. Recoger beneficios parciales vendiendo el 30% de la posición a cuenta de efectivo."
         msg_z1 = "Tensión alcista en madurez. Frenar compras adicionales y vigilar divergencias de RSI."
     else:
-        msg_z3 = "Extremo sobrecalentamiento. Traspasar entre 60% y 100% al Fondo Monetario (0 € peaje fiscal)."
-        msg_z2 = "Fuerte tensión alcista. Traspasar el 30% de la posición al Fondo Monetario (0 € peaje fiscal)."
+        msg_z3 = f"Extremo sobrecalentamiento. Traspasar entre 60% y 100% al Fondo Monetario {NOMBRE_MONETARIO_NODRIZA} (0 € peaje fiscal)."
+        msg_z2 = f"Fuerte tensión alcista. Traspasar el 30% de la posición al Fondo Monetario {NOMBRE_MONETARIO_NODRIZA} (0 € peaje fiscal)."
         msg_z1 = "Tensión alcista inicial. Frenar nuevas compras y vigilar soporte de medias."
         
     if ds >= reglas["v3"] and rsi >= reglas["rsi_v3"]:
@@ -366,6 +563,17 @@ def evaluar_venta_cava(d, reglas):
         return 1, "VENTA ZONA 1 (VIGILANCIA)", msg_z1
     return 0, "MANTENER", "Parámetros técnicos sanos. Mantener posición."
 
+def estado_hora_corte(hora_limite):
+    ahora = datetime.now()
+    if ahora.weekday() >= 5:
+        return f"⏸️ Fin de semana (Corte L-V {hora_limite:02d}:00h)", False
+    if ahora.hour < hora_limite:
+        restante_min = (hora_limite - 1 - ahora.hour) * 60 + (60 - ahora.minute)
+        horas_r = restante_min // 60
+        mins_r = restante_min % 60
+        return f"🟢 EN HORA HOY (Corte {hora_limite:02d}:00h — quedan {horas_r}h {mins_r}m)", True
+    return f"🟠 PASA A MAÑANA (Superado corte {hora_limite:02d}:00h)", False
+
 # ==================== CABECERA PRINCIPAL ====================
 st.title("🦈 Radar Tiburón Cava Pro — Asignación 60.000 €")
 
@@ -375,13 +583,17 @@ c_m1, c_m2, c_m3, c_m4 = st.columns(4)
 c_m1.info(f"🏛️ **Ciclo Presidencial:**\n{get_ciclo_presidencial()}")
 c_m2.warning(f"📅 **Estacionalidad:**\n{get_estacionalidad()}")
 c_m3.metric("VIX Actual", f"{v_info['actual']:.2f}", f"{v_info['tension']:+.1%} vs SMA10 ({v_info['sma10']:.1f})")
-c_m4.success(f"🛡️ **Colchón Fuera:**\n{COLCHON_EMERGENCIAS:,.0f} € (Trade Republic 3%)")
+c_m4.success(f"🛡️ **Colchón Fuera:**\n{COLCHON_EMERGENCIAS:,.0f} € (Trade Republic / MyInvestor)")
 
 # Barra lateral
 st.sidebar.header("💼 Arquitectura de Cartera")
 st.sidebar.markdown(f"**Capital Radar:** `{CAPITAL_RADAR:,.0f} €`")
-st.sidebar.markdown(f"**Monetario Puente (25%):** `{CAPITAL_RADAR * LIQUIDEZ_MONETARIO_PESO:,.0f} €`")
+st.sidebar.markdown(f"**Búnker AXA ({ISIN_MONETARIO_NODRIZA}):** `{CAPITAL_RADAR * LIQUIDEZ_MONETARIO_PESO:,.0f} €` (25%)")
 st.sidebar.markdown(f"**Colchón Emergencias:** `{COLCHON_EMERGENCIAS:,.0f} €`")
+st.sidebar.markdown("---")
+ahora_str = datetime.now().strftime("%H:%M")
+st.sidebar.markdown(f"⏰ **Hora actual (CET):** `{ahora_str}`")
+st.sidebar.caption("Cortes MyInvestor: **10:00h** (AXA / iShares Europe) | **12:00h** (MyInvestor Nasdaq / Wellington / Vanguard / Pictet) | **14:00h** (Guinness) | **16:00h** (Fidelity S&P / World).")
 st.sidebar.markdown("---")
 st.sidebar.caption("Doctrina Cava: Comprar en tramos tras confirmación. Sin stops en fondos indexados; la liquidez en monetario es tu escudo protector.")
 
@@ -389,9 +601,13 @@ if st.sidebar.button("🔄 Forzar Datos en Vivo"):
     st.cache_data.clear()
     st.rerun()
 
-# Pestañas principales
-tab_senales, tab_flujo, tab_dow, tab_guia = st.tabs([
-    "🎯 Semáforo y Tramos", "🏛️ Rayos X de Flujo", "📰 Diario (Teoría de Dow)", "📖 Manual Operativo Cava"
+# Pestañas principales (5 pestañas con la nueva central de Fondos MyInvestor)
+tab_senales, tab_fondos_my, tab_flujo, tab_dow, tab_guia = st.tabs([
+    "🎯 Semáforo y Tramos",
+    "🏦 Fondos MyInvestor (Traspasos & Refugios)",
+    "🏛️ Rayos X de Flujo",
+    "📰 Diario (Teoría de Dow)",
+    "📖 Manual Operativo Cava"
 ])
 
 # ==================== PESTAÑA 1: SEÑALES Y TRAMOS ====================
@@ -419,7 +635,7 @@ with tab_senales:
         elif zona_v > 0: icon_c = "🟡"
         else: icon_c = "⚪"
         
-        badge_op = "⏱️ TRASPASO FONDO" if reglas["es_fondo"] else "⚡ INMEDIATO (Spot)"
+        badge_op = f"⏱️ TRASPASO FONDO (Corte {reglas['hora_corte']}:00h)" if reglas["es_fondo"] else "⚡ INMEDIATO (Spot)"
         
         with st.expander(f"{icon_c} **{nombre}** | {badge_op} | Compra: **{estado_c}** | Venta: **{estado_v}**", expanded=True):
             m1, m2, m3, m4, m5 = st.columns(5)
@@ -429,7 +645,8 @@ with tab_senales:
             m4.metric("MACD Semanal", "ALCISTA" if d['macd_alcista'] else "BAJISTA", "Sobre 0" if d['macd_cero'] else "Bajo 0")
             m5.metric("Estocástico (14w)", f"{d['stoch_k']:.1f}", "La Bonita" if d['la_bonita'] else "Neutro")
             
-            st.markdown(f"**Vehículo:** `{reglas['vehiculo']}` en **{reglas['plataforma']}** (Asignación total: **{cap_posicion:,.0f} €**)")
+            txt_corte, en_hora = estado_hora_corte(reglas["hora_corte"])
+            st.markdown(f"**Vehículo:** `{reglas['vehiculo']}` en **{reglas['plataforma']}** (Asignación total: **{cap_posicion:,.0f} €** | Ventana hoy: **{txt_corte}**)")
 
             # ==================== SECCIÓN 1: PÓLVORA TÁCTICA (TRAMOS DE CAPITAL) ====================
             st.markdown("---")
@@ -444,14 +661,14 @@ with tab_senales:
                 st.warning(f"#### 🛡️ {estado_c}\n{motivo_c}")
                 st.markdown(f"""
                 - **Tramo Táctico Retenido:** `{target_eur:,.0f} €` asignados a **Zona {target_zona}**.
-                - **Protocolo Cava:** La munición permanece en el Fondo Monetario o cuenta remunerada hasta que el VIX supere 20 o se confirme quiebre de estructura (BOS).
+                - **Protocolo Cava:** La munición permanece en el Fondo Monetario `{NOMBRE_MONETARIO_NODRIZA}` o cuenta remunerada hasta que el VIX supere 20 o se confirme quiebre de estructura (BOS).
                 """)
             elif "COMPRAR" in estado_c:
                 st.success(f"#### 🎯 {estado_c}\n{motivo_c}")
                 st.markdown(f"""
                 - **Tramo a Ejecutar AHORA:** `{target_eur:,.0f} €` (Zona {target_zona})
                 - **Vehículo de Destino:** `{reglas['vehiculo']}` en **{reglas['plataforma']}**
-                - **Procedimiento:** Si es fondo (MyInvestor), ordenar traspaso desde el Monetario (`FR0001028830`). Si es spot (Trade Republic), comprar a mercado.
+                - **Procedimiento:** Si es fondo (MyInvestor), ordenar traspaso desde el Monetario `{NOMBRE_MONETARIO_NODRIZA}` antes de las **{reglas['hora_corte']}:00h CET** (recuerda que AXA corta a las 10:00h). Si es spot, comprar a mercado.
                 - **Munición Restante en Reserva:** `{cap_posicion - target_eur:,.0f} €` para siguientes tramos.
                 """)
                 
@@ -459,7 +676,7 @@ with tab_senales:
             if zona_v > 0:
                 st.warning(f"#### ⚠️ {estado_v}\n{motivo_v}")
                 if reglas["es_fondo"]:
-                    st.markdown("👉 **Acción Recomendada:** Ordenar **traspaso hacia el Fondo Monetario** (`FR0001028830`) en MyInvestor para blindar plusvalías con 0 € de IRPF.")
+                    st.markdown(f"👉 **Acción Recomendada:** Ordenar **traspaso hacia el Fondo Monetario** `{NOMBRE_MONETARIO_NODRIZA}` en MyInvestor para blindar plusvalías con 0 € de IRPF.")
                 else:
                     st.markdown(f"""
                     👉 **Acción Recomendada ({nombre}):** En activos al contado (Spot), **se recogen beneficios vendiendo a cuenta de efectivo** (o stablecoin respaldada en euros).
@@ -479,7 +696,7 @@ with tab_senales:
                 bg_color = "#371515"
                 text_color = "#f87171"
                 accion_dca = "APORTACIÓN MÍNIMA DE CALENDARIO (SIN EXTRAS)"
-                mensaje_dca = "SOBRECOMPRA EXTREMA (%K > 80). Si tu disciplina exige aportar este mes, haz tu cuota normal fija de calendario, pero queda TERMINANTEMENTE PROHIBIDO gastar pólvora extra o adelantar aportaciones. El mercado está extendido."
+                mensaje_dca = "SOBRECOMPRA EXTREMA (%K > 80). Si tu disciplina exige aportar este mes, haz tu cuota normal fija de calendario, pero queda TERMINANTEMENTEMENTE PROHIBIDO gastar pólvora extra o adelantar aportaciones. El mercado está extendido."
             elif d['la_bonita']:
                 color_dca = "🟢"
                 border_color = "#22c55e"
@@ -514,17 +731,127 @@ with tab_senales:
             """, unsafe_allow_html=True)
 
             # ==================== AVISOS DE DISCIPLINA OPERATIVA CAVA ====================
-            # 1. Recordatorio para Fondos Indexados (MyInvestor T+2)
             if color_dca == "🟢" and reglas["es_fondo"]:
-                st.warning("⏱️ **RECORDATORIO OPERATIVO (FONDOS T+2):** Has recibido la señal de 'La Bonita'. Ordena el traspaso desde el Monetario (`FR0001028830`). Recuerda que la orden se liquidará a D+1 o D+2. **No canceles la orden si el precio oscila**, estás comprando valor con diferimiento fiscal (Art. 94 LIRPF).")
+                st.warning(f"⏱️ **RECORDATORIO OPERATIVO (FONDOS T+2):** Has recibido la señal de 'La Bonita'. Ordena el traspaso desde el Monetario `{NOMBRE_MONETARIO_NODRIZA}`. Recuerda que la orden se liquidará a D+1 o D+2. **No canceles la orden si el precio oscila**, estás comprando valor con diferimiento fiscal (Art. 94 LIRPF).")
             
-            # 2. Recordatorio para Activos Spot (Oro / Bitcoin)
             if color_dca == "🟢" and not reglas["es_fondo"]:
                 st.info(f"🛡️ **GESTIÓN DE RIESGO PATRIMONIAL ({nombre.upper()}):** En activos Spot (Trade Republic / MyInvestor) **NO se colocan Stop Loss automáticos**. Tu seguridad es el dimensionamiento ({reglas['peso']:.0%} de cartera = {cap_posicion:,.0f} €) y entrar en tramos (30%/30%/40%). La salida se realiza exclusivamente cuando el radar marque Venta Zona 2 o 3 por sobreextensión.")
 
             st.caption(f"Lecturas de Soporte DCA: Estocástico %K: {d['stoch_k']:.1f} | %D: {d['stoch_d']:.1f} | MACD Alcista: {'Sí' if d['macd_alcista'] else 'No'} | Pauta Bonita: {'Sí' if d['la_bonita'] else 'No'}")
 
-# ==================== PESTAÑA 2: RAYOS X INSTITUCIONAL ====================
+# ==================== PESTAÑA 2: FONDOS MYINVESTOR (TRASPASOS & REFUGIOS) ====================
+with tab_fondos_my:
+    st.subheader("🏦 Catálogo Maestro Auditado — Fondos Tradicionales Traspasables en MyInvestor")
+    st.caption("Circuito cerrado con diferimiento fiscal (Art. 94 LIRPF): todas las entradas tácticas salen del AXA Trésor Court Terme y todas las recogidas de beneficios o rotaciones defensivas regresan sin tributar en el IRPF.")
+
+    # --- 1. MONITOR EN VIVO DE HORAS DE CORTE (CUT-OFF CET) ---
+    st.markdown("#### ⏰ Monitor de Ventanas de Corte en MyInvestor (Horario CET)")
+    c_h1, c_h2, c_h3, c_h4 = st.columns(4)
+    txt_10, _ = estado_hora_corte(10)
+    txt_12, _ = estado_hora_corte(12)
+    txt_14, _ = estado_hora_corte(14)
+    txt_16, _ = estado_hora_corte(16)
+    c_h1.metric("Corte 10:00 CET", "AXA / iShares Eur", txt_10)
+    c_h2.metric("Corte 12:00 CET", "Nasdaq / Well. / Vang.", txt_12)
+    c_h3.metric("Corte 14:00 CET", "Guinness Energy", txt_14)
+    c_h4.metric("Corte 16:00 CET", "Fidelity S&P / World", txt_16)
+
+    # --- 2. MOTOR AUTOMÁTICO DE ROTACIÓN EN CRISIS (DOCTRINA CAVA) ---
+    st.markdown("---")
+    st.markdown("#### 🧭 Brújula de Rotación Defensiva en Crisis (¿AXA Monetario o Rotación Sectorial?)")
+    
+    d_sp = get_market_data("^GSPC")
+    d_ndx = get_market_data("^NDX")
+    v_act = v_info["actual"]
+
+    if d_sp and d_ndx:
+        caida_sp = d_sp["caida"]
+        caida_ndx = d_ndx["caida"]
+        bajo_sma_sp = d_sp["dist_sma"] < 0
+        bajo_sma_ndx = d_ndx["dist_sma"] < 0
+        divergencia_ia = (caida_ndx - caida_sp) <= -0.05  # Nasdaq cae >5% más que el S&P 500
+
+        if v_act >= 25.0 or (bajo_sma_sp and bajo_sma_ndx and v_act >= 20.0):
+            st.error(
+                f"🚨 **ALERTA DE PÁNICO DE LIQUIDEZ SISTÉMICA (VIX: {v_act:.1f}):** "
+                f"En crisis de liquidez o estrés crediticio (CDS), el MSCI World, S&P 500 y Nasdaq caen al unísono. "
+                f"**NO rotes a renta variable europea.** El único refugio real es traspasar hacia el búnker monetario "
+                f"**AXA Trésor Court Terme (`FR0000447823`)** con 0,25% de volatilidad y esperar suelo en Zona 2/3."
+            )
+        elif divergencia_ia or (bajo_sma_ndx and not bajo_sma_sp):
+            st.warning(
+                f"🔄 **ROTACIÓN SECTORIAL / PINCHAZO DE MÚLTIPLOS IA (Nasdaq {caida_ndx:.1%} vs S&P {caida_sp:.1%} con VIX {v_act:.1f}):** "
+                f"Corrección concentrada en megacaps tecnológicas sin colapso sistémico de liquidez. "
+                f"Escenario óptimo para rotar tácticamente hacia Farmacia USA (**Wellington Global Health Care `IE00BF2ZVB54`**) "
+                f"o Farmacia/Consumo Europeo Low-Cost (**iShares Europe Equity Index `LU0836512706`**)."
+            )
+        else:
+            st.success(
+                f"✅ **ESTRUCTURA PRIMARIA ESTABLE (S&P {caida_sp:.1%} | Nasdaq {caida_ndx:.1%} | VIX {v_act:.1f}):** "
+                f"Sin pánico de liquidez ni rotura simultánea de medias de 200 sesiones. "
+                f"Mantener núcleo en **Fidelity S&P 500 (`IE00BYX5MX67`)** / **Fidelity MSCI World (`IE00BYX5NX33`)** "
+                f"y custodiar la pólvora táctica en **AXA Trésor (`FR0000447823`)** para disparar en soportes."
+            )
+
+    # --- 3. TABLA MAESTRA DE LOS 9 FONDOS AUDITADOS (DATOS NETOS MORNINGSTAR / DFI) ---
+    st.markdown("---")
+    st.markdown("#### 📊 Auditoría de Calidad, Rentabilidad Neta (Gastos Incluidos) y Riesgo (Fichas Morningstar)")
+    
+    df_tabla = pd.DataFrame([
+        {
+            "Bloque Táctico": f["bloque"],
+            "Fondo de Inversión": f["nombre"],
+            "ISIN (Copiar)": f["isin"],
+            "Corte CET": f"{f['hora_corte']:02d}:00 h",
+            "TER Neto": f["ter"],
+            "2026": f["r_2026"],
+            "1 Año": f["r_1a"],
+            "3 Años (Anual.)": f["r_3a"],
+            "5 Años (Anual.)": f["r_5a"],
+            "Volatilidad 3A": f["vol_3a"],
+            "Sharpe 3A": f"{f['sharpe_3a']:.2f}",
+            "Rating": f["rating"],
+            "Veredicto": f["estado_calidad"]
+        }
+        for f in CATALOGO_FONDOS_MY
+    ])
+    st.dataframe(df_tabla, use_container_width=True, hide_index=True)
+
+    # --- 4. FICHAS DETALLADAS Y BUSCADOR RÁPIDO DE ISIN PARA MYINVESTOR ---
+    st.markdown("#### 🔍 Radiografía Individual de Cartera y Reglas de Traspaso por Fondo")
+    col_f1, col_f2 = st.columns(2)
+    for idx, f in enumerate(CATALOGO_FONDOS_MY):
+        target_col = col_f1 if idx % 2 == 0 else col_f2
+        with target_col:
+            txt_c, _ = estado_hora_corte(f["hora_corte"])
+            with st.expander(f"{f['estado_calidad']} | **{f['nombre']}** (`{f['isin']}`)", expanded=False):
+                st.markdown(f"- **Código ISIN (pegar en lupa MyInvestor):** `{f['isin']}`")
+                st.markdown(f"- **Bloque en el Radar:** {f['bloque']} | **Hora de corte:** `{f['hora_corte']:02d}:00 CET` ({txt_c})")
+                st.markdown(f"- **Coste (TER) descontado en VL:** `{f['ter']}` | **Ratio Sharpe (3A):** `{f['sharpe_3a']:.2f}` | **Volatilidad (3A):** `{f['vol_3a']}`")
+                st.markdown(f"- **Rentabilidades Netas:** 2026: `{f['r_2026']}` | 1 Año: `{f['r_1a']}` | 3 Años: `{f['r_3a']}` | 5 Años: `{f['r_5a']}`")
+                st.markdown(f"- **Principales Posiciones:** {f['top_holdings']}")
+                st.markdown(f"- **Función Estratégica Cava:** {f['rol_radar']}")
+
+    # --- 5. COMPARATIVA DE EFICIENCIA: TU RADAR DIRECTO VS. CARTERA INDIE ROBOADVISOR ---
+    st.markdown("---")
+    st.markdown("#### 🛡️ Auditoría de Costes y Eficiencia: Tu Cartera Directa vs. Cartera Indie (Roboadvisor MyInvestor)")
+    c_ef1, c_ef2, c_ef3 = st.columns(3)
+    ter_ponderado_radar = (0.40 * 0.0006) + (0.15 * 0.0038) + (0.15 * 0.0012) + (0.25 * 0.0005)
+    coste_anual_radar = CAPITAL_RADAR * ter_ponderado_radar
+    coste_anual_indie = CAPITAL_RADAR * 0.0041
+    ahorro_anual = coste_anual_indie - coste_anual_radar
+
+    c_ef1.metric("Coste Anual Tu Radar (60.000 €)", f"{coste_anual_radar:.2f} € / año", f"TER medio: {ter_ponderado_radar*100:.3f}% (0% gestión/custodia)")
+    c_ef2.metric("Coste Cartera Indie (0,41%)", f"{coste_anual_indie:.2f} € / año", "+0,30% extra de gestión y custodia Inversis", delta_color="inverse")
+    c_ef3.metric("Ahorro Neto Directo", f"+{ahorro_anual:.2f} € / año", "Sin riesgo de bonos a +20 años (0,01 dur. en AXA)")
+
+    st.info(
+        "💡 **Nota sobre Oro Físico (`IE00B4ND3602`) vs. Xetra-Gold (`DE000A0S9GB0`):** "
+        "El ETC **iShares Physical Gold (`IE00B4ND3602`)** cobra un **0,12% anual todo incluido** dentro del valor liquidativo (10,80 €/año sobre 9.000 €), "
+        "mientras que Xetra-Gold arrastra un coste de custodia en Clearstream del ~0,30%-0,36% anual y carece de exención fiscal en España."
+    )
+
+# ==================== PESTAÑA 3: RAYOS X INSTITUCIONAL ====================
 with tab_flujo:
     st.subheader("Rayos X de Flujo Institucional (Manos Fuertes vs. Débiles)")
     st.caption("Mide si las grandes instituciones están acumulando en silencio o distribuyendo papel a la masa.")
@@ -539,7 +866,7 @@ with tab_flujo:
             f2.metric("Acumulación / Distribución (A/D)", f"{fl['ad']:+.1%}", fl['ad_sig'])
             f3.metric("Precio VWAP Institucional", f"{fl['vwap']:,.2f} $", f"{fl['dist_vwap']:+.2f}% vs Spot")
 
-# ==================== PESTAÑA 3: TEORÍA DE DOW ====================
+# ==================== PESTAÑA 4: TEORÍA DE DOW ====================
 with tab_dow:
     st.subheader("Estructura de Tendencia (Teoría de Dow)")
     st.caption("Cava (Cap. I): Una tendencia alcista exige techos y suelos crecientes. Sin confirmación, no hay cambio de sesgo.")
@@ -552,9 +879,9 @@ with tab_dow:
         with st.expander(f"{dow['color']} **{nombre}** — Estructura {dow['trend']}", expanded=True):
             st.plotly_chart(grafico_dow(dow, nombre), use_container_width=True)
 
-# ==================== PESTAÑA 4: GUÍA OPERATIVA CAVA ====================
+# ==================== PESTAÑA 5: GUÍA OPERATIVA CAVA ====================
 with tab_guia:
-    st.markdown("""
+    st.markdown(f"""
     ### Principios Rectores de José Luis Cava (*El Arte de Especular*)
     
     1. **Comprar tras la confirmación, nunca en caída libre:**
@@ -568,11 +895,14 @@ with tab_guia:
        
     3. **¿Stop Loss en Bitcoin y Oro Spot? NUNCA:**
        - Colocar un stop automático en el exchange/broker regala tus participaciones a los creadores de mercado en barridas de volatilidad y te fuerza a tributar en el IRPF (19%-28%).
-       - Tu stop loss es el **dimensionamiento patrimonial**: 5% en Bitcoin (3.000 €) y 15% en Oro (9.000 €), respaldados por 10.000 € en colchón y 15.000 € en monetario.
+       - Tu stop loss es el **dimensionamiento patrimonial**: 5% en Bitcoin (3.000 €) y 15% en Oro (9.000 € en `IE00B4ND3602`), respaldados por 10.000 € en colchón y 15.000 € en monetario.
        
-    4. **Toma de Beneficios en Techos (Zonas de Venta 2 y 3):**
-       - Cuando Bitcoin o el Oro se distancian más de un 65%-100% de su media de 200 sesiones y el RSI supera 80, el radar activa la venta parcial. Ahí se recorta la posición y se pasa el beneficio a efectivo remunerado o al monetario.
+    4. **Protocolo de Rotación en Crisis (Fondos Tradicionales en MyInvestor):**
+       - **Pánico sistémico de liquidez / VIX > 25:** Cuando caen a la vez el MSCI World, el S&P 500 y el Nasdaq por drenaje de liquidez o tensión en CDS, se traspasa al búnker monetario **AXA Trésor Court Terme (`{ISIN_MONETARIO_NODRIZA}`)** con volatilidad del 0,25%.
+       - **Ajuste sectorial de múltiplos en IA (sin recesión general):** Cuando el dinero institucional huye de las tecnológicas caras hacia sectores de demanda inelástica, se rota sin peaje fiscal hacia **Wellington Global Health Care (`IE00BF2ZVB54`)** (80% farmacia EE. UU.: Eli Lilly, Merck, AbbVie) o **iShares Europe Equity Index (`LU0836512706`)** (Novo Nordisk, Novartis, Roche, Nestlé con 0,12% TER).
+       - **Shock de oferta energética / inflación geopolítica:** Cobertura táctica acotada (5%-10%) mediante **Guinness Global Energy (`IE00B3CCJB88`)**.
+       - **Recesión deflacionaria con recortes de tipos:** Activar duración mediante **Vanguard Global Bond Index EUR Hedged (`IE00B18GC888`)**.
        
     5. **El Diferimiento Fiscal del Art. 94 LIRPF en España:**
-       - Para el S&P 500 y Nasdaq 100, la recogida de beneficios se hace vía **traspaso interno al Fondo Monetario** (`FR0001028830`). Tus ganancias quedan protegidas y el interés compuesto sigue trabajando con 0 € de tributación inmediata.
+       - Para el S&P 500 (`IE00BYX5MX67`), MSCI World (`IE00BYX5NX33`) y Nasdaq 100 (`ES0165265002`), la recogida de beneficios y las entradas por tramos se ejecutan vía **traspaso interno desde/hacia el Fondo Monetario AXA (`{ISIN_MONETARIO_NODRIZA}`)**. Tus ganancias quedan protegidas y el interés compuesto sigue trabajando con 0 € de tributación inmediata.
     """)
