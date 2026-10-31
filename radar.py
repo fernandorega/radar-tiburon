@@ -30,7 +30,6 @@ st.markdown("""
     .dca-text { font-size: 0.95rem; opacity: 0.9; line-height: 1.4; }
     .dca-mult { font-size: 1.5rem; font-weight: 900; margin-left: 20px; padding: 8px 16px; border-radius: 8px; background: rgba(0,0,0,0.3); }
 
-    /* PANEL DE INDICADORES */
     .indicator-panel { display: flex; justify-content: space-between; background-color: #1e1e24; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #3f3f46; }
     .indicator-box { text-align: center; flex: 1; border-right: 1px solid #3f3f46; }
     .indicator-box:last-child { border-right: none; }
@@ -111,7 +110,10 @@ def get_market_data(ticker):
         if len(h) < 200: return None
         h52 = h.iloc[-lb:].copy()
         p = float(h52['Close'].iloc[-1]); mx = float(h52['High'].max())
+        
+        # SMA 200
         sma200 = float(h['Close'].rolling(200).mean().iloc[-1])
+        dist_sma = (p/sma200 - 1.0) if sma200 > 0 else 0.0
         
         # RSI
         delta = h52['Close'].diff()
@@ -137,7 +139,12 @@ def get_market_data(ticker):
         max_10d = float(h52['High'].shift(1).rolling(10).max().iloc[-1])
         bos = bool(p > max_10d) if not pd.isna(max_10d) else False
         
-        return {"precio": p, "max52": mx, "caida": (p/mx - 1.0) if mx > 0 else 0.0, "dist_sma": (p/sma200 - 1.0) if sma200 > 0 else 0.0, "rsi": rsi, "macd_alcista": macd_alcista, "stoch_k": stoch_k, "la_bonita": la_bonita, "bos": bos, "hist": h}
+        return {
+            "precio": p, "max52": mx, "caida": (p/mx - 1.0) if mx > 0 else 0.0, 
+            "sma200": sma200, "dist_sma": dist_sma, 
+            "rsi": rsi, "macd_alcista": macd_alcista, "stoch_k": stoch_k, 
+            "la_bonita": la_bonita, "bos": bos, "hist": h
+        }
     except: return None
 
 # ==================== GRÁFICAS ====================
@@ -159,16 +166,13 @@ def graficar_activo(hist, nombre):
 
 # ==================== RENDERIZADOR DE INDICADORES ====================
 def render_indicadores(d):
-    # Estocástico
     if d['stoch_k'] > 80: stoch_color = "#f87171"; stoch_txt = f"Sobrecarga ({d['stoch_k']:.0f})"
     elif d['stoch_k'] < 20: stoch_color = "#4ade80"; stoch_txt = f"Sobreventa ({d['stoch_k']:.0f})"
     else: stoch_color = "#facc15"; stoch_txt = f"Neutro ({d['stoch_k']:.0f})"
         
-    # La Bonita
     bonita_color = "#4ade80" if d['la_bonita'] else "#71717a"
     bonita_txt = "¡ACTIVA!" if d['la_bonita'] else "Inactiva"
     
-    # BOS
     bos_color = "#4ade80" if d['bos'] else "#71717a"
     bos_txt = "Roto 🟢" if d['bos'] else "No roto 🔴"
     
@@ -390,10 +394,15 @@ with t_fondos:
         dca = evaluar_semaforo_dca(d)
         
         with st.expander(f"{'🟢' if 'COMPRAR' in est_c else '⚪'} **{nombre}** | {est_c}"):
-            # PANEL DE INDICADORES
             render_indicadores(d)
             
-            # TARJETA DCA
+            # AÑADIDO: Precio Actual y SMA 200
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Precio Actual", f"{d['precio']:,.2f}")
+            c2.metric("SMA 200", f"{d['sma200']:,.2f}", f"{d['dist_sma']:+.2%}")
+            c3.metric("Caída (ATH)", f"{d['caida']:.2%}")
+            c4.metric("Gatillo Teórico (Z1)", f"{d['max52']*(1+info['c1']):,.2f}")
+            
             st.markdown(f"""
             <div class="dca-card" style="background-color: {dca['bg']}; border-left-color: {dca['border']};">
                 <div class="dca-icon">{dca['icon']}</div>
@@ -401,11 +410,6 @@ with t_fondos:
                 <div class="dca-mult" style="color: {dca['color']};">{dca['mult']}</div>
             </div>
             """, unsafe_allow_html=True)
-            
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Caída (ATH)", f"{d['caida']:.2%}")
-            c2.metric("Gatillo Teórico (Z1)", f"{d['max52']*(1+info['c1']):,.2f}")
-            c3.metric("Gatillo con Buffer", f"{d['max52']*(1+info['c1']*calcular_factor_buffer(d, modo_buffer)):,.2f}")
             
             if "COMPRAR" in est_c:
                 teur = max(o_act, 1000)*0.3
@@ -422,7 +426,13 @@ with t_cortos:
         señal, msg, ventanas = detectar_trampa_consenso(d, d["hist"])
         
         st.markdown(f"#### ⚡ {nombre}")
-        render_indicadores(d) # Mostramos el panel aquí también
+        render_indicadores(d)
+        
+        # AÑADIDO: Precio Actual y SMA 200
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Precio Actual", f"{d['precio']:,.2f}")
+        c2.metric("SMA 200", f"{d['sma200']:,.2f}", f"{d['dist_sma']:+.2%}")
+        c3.metric("RSI", f"{d['rsi']:.1f}")
         
         if ventanas:
             v_cols = st.columns(len(ventanas))
@@ -448,10 +458,15 @@ with t_largo:
         dca = evaluar_semaforo_dca(d)
         
         with st.expander(f"{'🟢' if 'COMPRAR' in est_c else '🔴' if 'BLOQUEADO' in est_c else '⚪'} **{nombre}** | {est_c}"):
-            # PANEL DE INDICADORES
             render_indicadores(d)
             
-            # TARJETA DCA
+            # AÑADIDO: Precio Actual y SMA 200
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Precio Actual", f"{d['precio']:,.2f}")
+            c2.metric("SMA 200", f"{d['sma200']:,.2f}", f"{d['dist_sma']:+.2%}")
+            c3.metric("Caída (ATH)", f"{d['caida']:.2%}")
+            c4.metric("Próximo Gatillo", f"{d['max52']*(1+info['c1']):,.2f}")
+            
             st.markdown(f"""
             <div class="dca-card" style="background-color: {dca['bg']}; border-left-color: {dca['border']};">
                 <div class="dca-icon">{dca['icon']}</div>
@@ -459,11 +474,6 @@ with t_largo:
                 <div class="dca-mult" style="color: {dca['color']};">{dca['mult']}</div>
             </div>
             """, unsafe_allow_html=True)
-            
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Caída (ATH)", f"{d['caida']:.2%}")
-            c2.metric("Próximo Gatillo", f"{d['max52']*(1+info['c1']):,.2f}")
-            c3.metric("RSI", f"{d['rsi']:.1f}")
             
             if "BLOQUEADO VIX" in est_c:
                 st.error(f"🛡️ **BLOQUEADO POR PÁNICO:** Caída del {d['caida']:.1%} pero VIX en {v_info['actual']:.1f} (por debajo de 20). El mercado no tiene pánico institucional. Cava dice: NO COMPRES AÚN.")
