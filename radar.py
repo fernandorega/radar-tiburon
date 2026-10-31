@@ -22,15 +22,23 @@ st.markdown("""
     .semaforo-verde { background-color: #143320; border-left: 6px solid #22c55e; padding: 16px; border-radius: 10px; margin-bottom: 12px;}
     .semaforo-rojo { background-color: #371515; border-left: 6px solid #ef4444; padding: 16px; border-radius: 10px; margin-bottom: 12px;}
     .semaforo-amarillo { background-color: #332b14; border-left: 6px solid #eab308; padding: 16px; border-radius: 10px; margin-bottom: 12px;}
-    .aviso-buffer { background-color: #332b14; border-left: 6px solid #eab308; padding: 12px; border-radius: 8px; font-size: 0.9rem; margin-top: 8px; }
     
-    /* DISEÑO DCA */
     .dca-card { display: flex; align-items: center; padding: 16px; border-radius: 12px; margin-top: 15px; margin-bottom: 15px; border-left: 8px solid; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
     .dca-icon { font-size: 2.5rem; margin-right: 20px; }
     .dca-content { flex-grow: 1; }
     .dca-title { font-weight: 800; font-size: 1.15rem; margin-bottom: 4px; letter-spacing: 0.5px; }
     .dca-text { font-size: 0.95rem; opacity: 0.9; line-height: 1.4; }
     .dca-mult { font-size: 1.5rem; font-weight: 900; margin-left: 20px; padding: 8px 16px; border-radius: 8px; background: rgba(0,0,0,0.3); }
+
+    /* PANEL DE INDICADORES */
+    .indicator-panel { display: flex; justify-content: space-between; background-color: #1e1e24; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #3f3f46; }
+    .indicator-box { text-align: center; flex: 1; border-right: 1px solid #3f3f46; }
+    .indicator-box:last-child { border-right: none; }
+    .ind-title { font-size: 0.75rem; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+    .ind-value { font-size: 1.1rem; font-weight: 700; }
+    .ind-desc { font-size: 0.7rem; color: #71717a; margin-top: 2px; }
+    
+    .aviso-mercado { background-color: #1e1e24; border: 1px solid #3f3f46; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; color: #d4d4d8; margin-bottom: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -61,39 +69,32 @@ ISIN_MONETARIO_NODRIZA = "FR0000447823"
 
 # ==================== CATÁLOGOS ====================
 FONDOS = {
-    "AXA Trésor Court Terme C": {"ticker": "^IRX", "es_monetario": True, "isin": ISIN_MONETARIO_NODRIZA, "hora_corte": 10, "peso_obj": 0.25, "saldo_default": 15000.0, "c1": -0.01, "c2": -0.02, "c3": -0.03, "v1": 0.10, "v2": 0.20, "v3": 0.30, "rsi_v1": 80, "rsi_v2": 85, "rsi_v3": 90},
-    "Fidelity S&P 500 Index P": {"ticker": "^GSPC", "es_monetario": False, "isin": "IE00BYX5MX67", "hora_corte": 16, "peso_obj": 0.25, "saldo_default": 15000.0, "c1": -0.04, "c2": -0.10, "c3": -0.20, "v1": 0.15, "v2": 0.25, "v3": 0.35, "rsi_v1": 70, "rsi_v2": 75, "rsi_v3": 80},
-    "Fidelity MSCI World Index P": {"ticker": "URTH", "es_monetario": False, "isin": "IE00BYX5NX33", "hora_corte": 16, "peso_obj": 0.10, "saldo_default": 6000.0, "c1": -0.04, "c2": -0.10, "c3": -0.18, "v1": 0.14, "v2": 0.22, "v3": 0.32, "rsi_v1": 70, "rsi_v2": 75, "rsi_v3": 80},
-    "MyInvestor Nasdaq 100 FI": {"ticker": "^NDX", "es_monetario": False, "isin": "ES0165265002", "hora_corte": 12, "peso_obj": 0.10, "saldo_default": 6000.0, "c1": -0.06, "c2": -0.15, "c3": -0.25, "v1": 0.18, "v2": 0.30, "v3": 0.45, "rsi_v1": 70, "rsi_v2": 75, "rsi_v3": 80},
-    "iShares Europe Equity Index A2": {"ticker": "VGK", "es_monetario": False, "isin": "LU0836512706", "hora_corte": 10, "peso_obj": 0.03, "saldo_default": 1800.0, "c1": -0.04, "c2": -0.09, "c3": -0.16, "v1": 0.12, "v2": 0.20, "v3": 0.28, "rsi_v1": 68, "rsi_v2": 73, "rsi_v3": 78},
-    "Wellington Global Health Care D": {"ticker": "XLV", "es_monetario": False, "isin": "IE00BF2ZVB54", "hora_corte": 12, "peso_obj": 0.03, "saldo_default": 1800.0, "c1": -0.04, "c2": -0.09, "c3": -0.16, "v1": 0.14, "v2": 0.22, "v3": 0.30, "rsi_v1": 70, "rsi_v2": 75, "rsi_v3": 80},
-    "Guinness Global Energy D EUR": {"ticker": "XLE", "es_monetario": False, "isin": "IE00B3CCJB88", "hora_corte": 14, "peso_obj": 0.02, "saldo_default": 1200.0, "c1": -0.06, "c2": -0.14, "c3": -0.24, "v1": 0.18, "v2": 0.28, "v3": 0.40, "rsi_v1": 70, "rsi_v2": 75, "rsi_v3": 80},
-    "Vanguard Global Bond Hedged": {"ticker": "BND", "es_monetario": False, "isin": "IE00B18GC888", "hora_corte": 12, "peso_obj": 0.01, "saldo_default": 600.0, "c1": -0.03, "c2": -0.06, "c3": -0.10, "v1": 0.08, "v2": 0.14, "v3": 0.20, "rsi_v1": 68, "rsi_v2": 72, "rsi_v3": 76},
-    "Pictet - Nutrition P EUR": {"ticker": "XLP", "es_monetario": False, "isin": "LU0366534344", "hora_corte": 12, "peso_obj": 0.01, "saldo_default": 600.0, "c1": -0.04, "c2": -0.09, "c3": -0.16, "v1": 0.12, "v2": 0.20, "v3": 0.28, "rsi_v1": 68, "rsi_v2": 73, "rsi_v3": 78}
+    "AXA Trésor Court Terme C": {"ticker": "^IRX", "es_monetario": True, "isin": ISIN_MONETARIO_NODRIZA, "hora_corte": 10, "peso_obj": 0.25, "saldo_default": 15000.0, "c1": -0.01, "c2": -0.02, "c3": -0.03},
+    "Fidelity S&P 500 Index P": {"ticker": "^GSPC", "es_monetario": False, "isin": "IE00BYX5MX67", "hora_corte": 16, "peso_obj": 0.25, "saldo_default": 15000.0, "c1": -0.04, "c2": -0.10, "c3": -0.20},
+    "Fidelity MSCI World Index P": {"ticker": "URTH", "es_monetario": False, "isin": "IE00BYX5NX33", "hora_corte": 16, "peso_obj": 0.10, "saldo_default": 6000.0, "c1": -0.04, "c2": -0.10, "c3": -0.18},
+    "MyInvestor Nasdaq 100 FI": {"ticker": "^NDX", "es_monetario": False, "isin": "ES0165265002", "hora_corte": 12, "peso_obj": 0.10, "saldo_default": 6000.0, "c1": -0.06, "c2": -0.15, "c3": -0.25},
+    "iShares Europe Equity Index A2": {"ticker": "VGK", "es_monetario": False, "isin": "LU0836512706", "hora_corte": 10, "peso_obj": 0.03, "saldo_default": 1800.0, "c1": -0.04, "c2": -0.09, "c3": -0.16},
+    "Wellington Global Health Care D": {"ticker": "XLV", "es_monetario": False, "isin": "IE00BF2ZVB54", "hora_corte": 12, "peso_obj": 0.03, "saldo_default": 1800.0, "c1": -0.04, "c2": -0.09, "c3": -0.16},
+    "Guinness Global Energy D EUR": {"ticker": "XLE", "es_monetario": False, "isin": "IE00B3CCJB88", "hora_corte": 14, "peso_obj": 0.02, "saldo_default": 1200.0, "c1": -0.06, "c2": -0.14, "c3": -0.24},
+    "Vanguard Global Bond Hedged": {"ticker": "BND", "es_monetario": False, "isin": "IE00B18GC888", "hora_corte": 12, "peso_obj": 0.01, "saldo_default": 600.0, "c1": -0.03, "c2": -0.06, "c3": -0.10},
+    "Pictet - Nutrition P EUR": {"ticker": "XLP", "es_monetario": False, "isin": "LU0366534344", "hora_corte": 12, "peso_obj": 0.01, "saldo_default": 600.0, "c1": -0.04, "c2": -0.09, "c3": -0.16}
 }
 CORTOS_HOPLA = {"S&P 500 (Corto)": {"ticker": "^GSPC"}, "Nasdaq 100 (Corto)": {"ticker": "^NDX"}, "Oro (Corto)": {"ticker": "GC=F"}}
 LARGO_PLAZO = {
-    "Oro Físico (Largo)": {"ticker": "GC=F", "isin": "IE00B4ND3602", "peso_obj": 0.15, "saldo_default": 9000.0, "c1": -0.05, "c2": -0.10, "c3": -0.18, "v1": 0.15, "v2": 0.25, "v3": 0.35, "rsi_v1": 70, "rsi_v2": 75, "rsi_v3": 80},
-    "Bitcoin (Largo)": {"ticker": "BTC-USD", "isin": "BTC-USD", "peso_obj": 0.05, "saldo_default": 3000.0, "c1": -0.15, "c2": -0.30, "c3": -0.50, "v1": 0.35, "v2": 0.65, "v3": 1.00, "rsi_v1": 75, "rsi_v2": 80, "rsi_v3": 85}
+    "Oro Físico (Largo)": {"ticker": "GC=F", "isin": "IE00B4ND3602", "peso_obj": 0.15, "saldo_default": 9000.0, "c1": -0.05, "c2": -0.10, "c3": -0.18},
+    "Bitcoin (Largo)": {"ticker": "BTC-USD", "isin": "BTC-USD", "peso_obj": 0.05, "saldo_default": 3000.0, "c1": -0.15, "c2": -0.30, "c3": -0.50}
 }
 ACTIVOS_RADAR = {**FONDOS, **LARGO_PLAZO}
 
-# Añadimos las cuentas de efectivo al estado
-default_state = {
-    "colchon_emergencias": COLCHON_EMERGENCIAS_DEFAULT, 
-    "cuenta_my": 0.0, 
-    "cuenta_trade": 0.0,
-    "saldos": {k: v["saldo_default"] for k, v in ACTIVOS_RADAR.items()}, 
-    "objetivos": {k: CAPITAL_RADAR_DEFAULT * v["peso_obj"] for k, v in ACTIVOS_RADAR.items()}, 
-    "ordenes_pendientes": [],
-    "historial_compras": [] # Registro de compras para calcular PMC
-}
+default_state = {"colchon_emergencias": COLCHON_EMERGENCIAS_DEFAULT, "cuenta_my": 0.0, "cuenta_trade": 0.0, "saldos": {k: v["saldo_default"] for k, v in ACTIVOS_RADAR.items()}, "objetivos": {k: CAPITAL_RADAR_DEFAULT * v["peso_obj"] for k, v in ACTIVOS_RADAR.items()}, "ordenes_pendientes": [], "historial_compras": []}
 estado_cartera = cargar_json(F_SALDOS, default_state)
 for k, v in ACTIVOS_RADAR.items():
     if k not in estado_cartera["saldos"]: estado_cartera["saldos"][k] = v["saldo_default"]
     if k not in estado_cartera["objetivos"]: estado_cartera["objetivos"][k] = CAPITAL_RADAR_DEFAULT * v["peso_obj"]
 
-# ==================== DATA ====================
+# ==================== UTILIDAD MERCADO ====================
+def es_fin_de_semana(): return datetime.now().weekday() >= 5
+
 @st.cache_data(ttl=60)
 def get_vix_data():
     try:
@@ -111,21 +112,28 @@ def get_market_data(ticker):
         h52 = h.iloc[-lb:].copy()
         p = float(h52['Close'].iloc[-1]); mx = float(h52['High'].max())
         sma200 = float(h['Close'].rolling(200).mean().iloc[-1])
+        
+        # RSI
         delta = h52['Close'].diff()
         g = delta.clip(lower=0).ewm(alpha=1/14, adjust=False).mean()
         l = -delta.clip(upper=0).ewm(alpha=1/14, adjust=False).mean()
         rsi = float((100 - 100/(1 + g/l.replace(0, 1e-9))).iloc[-1])
         
+        # MACD Semanal
         h_w = h.resample('W').agg({'High':'max','Low':'min','Close':'last'}).dropna()
         macd = h_w['Close'].ewm(span=12).mean() - h_w['Close'].ewm(span=26).mean()
         sig = macd.ewm(span=9).mean()
         macd_alcista = bool(macd.iloc[-1] > sig.iloc[-1])
         
+        # Estocástico Semanal
         l14 = h_w['Low'].rolling(14).min(); h14 = h_w['High'].rolling(14).max()
         k = 100 * ((h_w['Close'] - l14) / (h14 - l14).replace(0, 1e-9))
         stoch_k, stoch_d = float(k.iloc[-1]), float(k.rolling(3).mean().iloc[-1])
+        
+        # La Bonita
         la_bonita = bool(macd_alcista and (stoch_k < 40 and stoch_k > stoch_d))
         
+        # BOS (Break of Structure) - Máximo de los últimos 10 días
         max_10d = float(h52['High'].shift(1).rolling(10).max().iloc[-1])
         bos = bool(p > max_10d) if not pd.isna(max_10d) else False
         
@@ -149,20 +157,73 @@ def graficar_activo(hist, nombre):
     fig.update_layout(height=400, template="plotly_dark", margin=dict(l=10, r=10, t=30, b=10), showlegend=False)
     return fig
 
-# ==================== MOTORES (FONDOS, DCA, HOPLA) ====================
-def calcular_factor_buffer(d, modo_buffer):
-    if modo_buffer == "Exacto (sin buffer)": return 1.0, "Modo exacto."
-    if modo_buffer == "Anticipado agresivo (25%)": return 0.75, "Modo agresivo."
-    if d['rsi'] < 30 or d['la_bonita'] or d['dist_sma'] < -0.15: return 1.0, "Buffer desactivado por reversión."
-    if d['dist_sma'] < 0 and not d['macd_alcista']: return 0.85, "Buffer 15% activo."
-    return 1.0, "Contexto ambiguo."
+# ==================== RENDERIZADOR DE INDICADORES ====================
+def render_indicadores(d):
+    # Estocástico
+    if d['stoch_k'] > 80: stoch_color = "#f87171"; stoch_txt = f"Sobrecarga ({d['stoch_k']:.0f})"
+    elif d['stoch_k'] < 20: stoch_color = "#4ade80"; stoch_txt = f"Sobreventa ({d['stoch_k']:.0f})"
+    else: stoch_color = "#facc15"; stoch_txt = f"Neutro ({d['stoch_k']:.0f})"
+        
+    # La Bonita
+    bonita_color = "#4ade80" if d['la_bonita'] else "#71717a"
+    bonita_txt = "¡ACTIVA!" if d['la_bonita'] else "Inactiva"
+    
+    # BOS
+    bos_color = "#4ade80" if d['bos'] else "#71717a"
+    bos_txt = "Roto 🟢" if d['bos'] else "No roto 🔴"
+    
+    st.markdown(f"""
+    <div class="indicator-panel">
+        <div class="indicator-box">
+            <div class="ind-title">Estocástico (14w)</div>
+            <div class="ind-value" style="color: {stoch_color};">{stoch_txt}</div>
+            <div class="ind-desc">Termómetro de ímpetu</div>
+        </div>
+        <div class="indicator-box">
+            <div class="ind-title">Pauta Bonita</div>
+            <div class="ind-value" style="color: {bonita_color};">{bonita_txt}</div>
+            <div class="ind-desc">MACD + Estocástico</div>
+        </div>
+        <div class="indicator-box">
+            <div class="ind-title">BOS (10d)</div>
+            <div class="ind-value" style="color: {bos_color};">{bos_txt}</div>
+            <div class="ind-desc">Ruptura de estructura</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
+# ==================== LÓGICA DCA Y EVALUACIÓN ====================
 def evaluar_semaforo_dca(d):
     if d['stoch_k'] > 80: return {"bg": "#371515", "border": "#ef4444", "icon": "🛑", "title": "APORTACIÓN MÍNIMA (Sobrecarga)", "msg": "Estocástico en sobrecompra. Prohibido añadir extra.", "mult": "0.5x", "color": "#f87171"}
     elif d['la_bonita']: return {"bg": "#143320", "border": "#22c55e", "icon": "🚀", "title": "APORTACIÓN EXTRA (Pauta Bonita)", "msg": "¡Momento estadístico óptimo! Inyecta más capital.", "mult": "1.5x", "color": "#4ade80"}
     elif d['macd_alcista']: return {"bg": "#332b14", "border": "#eab308", "icon": "✅", "title": "APORTACIÓN NORMAL", "msg": "Tendencia sana. Mantén tu ritmo DCA.", "mult": "1.0x", "color": "#facc15"}
     else: return {"bg": "#2d1b12", "border": "#f97316", "icon": "⚠️", "title": "APORTACIÓN MÍNIMA (Prudencia)", "msg": "Mercado débil. Mantén la pólvora seca.", "mult": "0.5x", "color": "#fb923c"}
 
+def calcular_factor_buffer(d, modo_buffer):
+    if modo_buffer == "Exacto (sin buffer)": return 1.0
+    if modo_buffer == "Anticipado agresivo (25%)": return 0.75
+    if d['rsi'] < 30 or d['la_bonita'] or d['dist_sma'] < -0.15: return 1.0
+    if d['dist_sma'] < 0 and not d['macd_alcista']: return 0.85
+    return 1.0
+
+def evaluar_fondo(d, info, modo_buffer):
+    if info.get("es_monetario"): return "BÚNKER"
+    caida = d["caida"]; factor = calcular_factor_buffer(d, modo_buffer)
+    if d['la_bonita']: factor *= BONUS_BONITA
+    if caida <= info["c3"]*factor: return "COMPRAR ZONA 3"
+    if caida <= info["c2"]*factor: return "COMPRAR ZONA 2"
+    if caida <= info["c1"]*factor: return "COMPRAR ZONA 1"
+    return "ESPERAR"
+
+def evaluar_largo_plazo(d, info, v_info):
+    caida = d["caida"]
+    if abs(caida) >= 0.25 and v_info["actual"] < 20.0: return "BLOQUEADO VIX"
+    if caida <= info["c3"]: return "COMPRAR ZONA 3"
+    if caida <= info["c2"]: return "COMPRAR ZONA 2"
+    if caida <= info["c1"]: return "COMPRAR ZONA 1"
+    return "ESPERAR"
+
+# ==================== LÓGICA HOPLA ====================
 def detectar_swing_points(series, window=5):
     swings = []
     for i in range(window, len(series) - window):
@@ -189,57 +250,44 @@ def detectar_trampa_techo_falso_single(hist, window=5):
     onda_b = next((s for s in swing_post if s[0] == "max" and s[2] < max2[2]), None) if swing_post else None
     if not onda_b: return None
     stop_loss = max(max1[2], max2[2]) * 1.01
-    return {"entrada": cierres[-1], "stop_loss": stop_loss, "objetivo": valle[2] * 0.95, "motivo": f"Trampa confirmada. Ruptura valle {valle[2]:.2f}."}
+    return {"entrada": cierres[-1], "stop_loss": stop_loss, "objetivo": valle[2] * 0.95, "motivo": f"Trampa confirmada."}
 
 def detectar_trampa_consenso(d, hist):
     if not d.get('macd_alcista', False): return None, "MACD bajista.", {}
     resultados = {w: detectar_trampa_techo_falso_single(hist, w) is not None for w in VENTANAS_ZIGZAG}
     activas = [w for w, act in resultados.items() if act]
-    if len(activas) >= 3:
-        return detectar_trampa_techo_falso_single(hist, activas[0]), f"ROBUSTA ({len(activas)}/5)", resultados
-    elif len(activas) > 0:
-        return detectar_trampa_techo_falso_single(hist, activas[0]), f"DÉBIL ({len(activas)}/5)", resultados
+    if len(activas) >= 3: return detectar_trampa_techo_falso_single(hist, activas[0]), f"ROBUSTA ({len(activas)}/5)", resultados
+    elif len(activas) > 0: return detectar_trampa_techo_falso_single(hist, activas[0]), f"DÉBIL ({len(activas)}/5)", resultados
     return None, "Sin señal.", resultados
 
-# ==================== REGISTRO Y LEDGER ====================
+# ==================== LEDGER Y REGISTROS ====================
 def registrar_orden(nombre, importe, precio, ticker):
     saldo_axa = estado_cartera["saldos"].get("AXA Trésor Court Terme C", 0.0)
     if saldo_axa < importe: st.error(f"❌ Saldo insuficiente en AXA ({saldo_axa:,.2f} €)."); return
     f_ord = datetime.now(); f_liq = f_ord + timedelta(days=DIAS_LIQUIDACION_FONDOS)
     estado_cartera["ordenes_pendientes"].append({"id": f"{nombre}_{f_ord.strftime('%H%M%S')}", "fecha_orden": f_ord.isoformat(), "fecha_liq": f_liq.isoformat(), "activo": nombre, "importe": importe, "precio_ord": precio, "ticker": ticker, "estado": "pendiente"})
     guardar_json(F_SALDOS, estado_cartera)
-    st.success(f"✅ Orden registrada. Se descontarán {importe:,.0f} € de AXA al liquidar.")
+    st.success(f"✅ Orden registrada.")
 
 def liquidar_orden(id_orden):
     for o in estado_cartera["ordenes_pendientes"]:
         if o["id"] == id_orden and o["estado"] == "pendiente":
             o["estado"] = "liquidada"
-            # Sumar al saldo del activo
             estado_cartera["saldos"][o["activo"]] = estado_cartera["saldos"].get(o["activo"], 0) + o["importe"]
-            # Restar del AXA
             estado_cartera["saldos"]["AXA Trésor Court Terme C"] -= o["importe"]
-            # AÑADIR AL LEDGER (Historial de compras)
-            estado_cartera["historial_compras"].append({
-                "activo": o["activo"], 
-                "fecha": datetime.now().isoformat(), 
-                "importe": o["importe"], 
-                "precio": o["precio_ord"]
-            })
+            estado_cartera["historial_compras"].append({"activo": o["activo"], "fecha": datetime.now().isoformat(), "importe": o["importe"], "precio": o["precio_ord"]})
             guardar_json(F_SALDOS, estado_cartera)
             st.rerun()
 
 # ==================== INTERFAZ PRINCIPAL ====================
 with st.sidebar:
     st.header("💼 Mi Patrimonio Real")
-    
     with st.expander("💵 Cuentas y Efectivo", expanded=True):
         colchon = st.number_input("🛡️ Colchón (Trade)", value=float(estado_cartera.get("colchon_emergencias", 10000.0)), step=500.0)
         c_my = st.number_input("🟢 Cuenta MY (2%)", value=float(estado_cartera.get("cuenta_my", 0.0)), step=500.0)
         c_tr = st.number_input("🔵 Cuenta Trade (3%)", value=float(estado_cartera.get("cuenta_trade", 0.0)), step=500.0)
         if st.button("💾 Guardar Efectivo", use_container_width=True):
-            estado_cartera["colchon_emergencias"] = colchon
-            estado_cartera["cuenta_my"] = c_my
-            estado_cartera["cuenta_trade"] = c_tr
+            estado_cartera["colchon_emergencias"] = colchon; estado_cartera["cuenta_my"] = c_my; estado_cartera["cuenta_trade"] = c_tr
             guardar_json(F_SALDOS, estado_cartera); st.rerun()
             
     with st.expander("📈 Saldos Invertidos", expanded=False):
@@ -254,7 +302,6 @@ with st.sidebar:
     st.markdown("### ⚙️ Modo de Ejecución")
     modo_buffer = st.radio("Buffer de anticipación (T+4):", ["Smart Buffer (recomendado)", "Exacto (sin buffer)", "Anticipado agresivo (25%)"], index=0)
 
-# Calcular Totales Globales
 total_invertido = sum(estado_cartera["saldos"].get(k, 0) for k in ACTIVOS_RADAR.keys())
 total_efectivo = estado_cartera.get("colchon_emergencias", 0) + estado_cartera.get("cuenta_my", 0) + estado_cartera.get("cuenta_trade", 0)
 patrimonio_total = total_invertido + total_efectivo
@@ -262,6 +309,9 @@ patrimonio_total = total_invertido + total_efectivo
 st.title("🦈 Robot Avizor Cava — Gestor Pro de Patrimonio")
 v_info = get_vix_data()
 st.info(f"**VIX:** {v_info['actual']:.2f} | **Tensión:** {v_info['tension']:+.1%} | **Patrimonio Total:** {patrimonio_total:,.0f} € | **Liquidez AXA:** {estado_cartera['saldos'].get('AXA Trésor Court Terme C', 0):,.0f} €")
+
+if es_fin_de_semana():
+    st.warning("📅 **Fin de semana:** Los mercados tradicionales (Fondos, S&P, Nasdaq, Oro) están cerrados. Los precios mostrados son el cierre del viernes. Los indicadores (BOS, RSI, MACD) no cambiarán hasta el lunes. **Solo Bitcoin cotiza 24/7.**")
 
 t_cartera, t_fondos, t_cortos, t_largo, t_ordenes = st.tabs([
     "📊 Mi Cartera Global", 
@@ -274,27 +324,20 @@ t_cartera, t_fondos, t_cortos, t_largo, t_ordenes = st.tabs([
 # --- PESTAÑA 0: CARTERA GLOBAL ---
 with t_cartera:
     st.subheader("📊 Dashboard Consolidado de tu Riqueza")
-    
-    # 1. Métricas Principales
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Patrimonio Total", f"{patrimonio_total:,.0f} €")
     m2.metric("Total Invertido", f"{total_invertido:,.0f} €")
     m3.metric("Total Efectivo", f"{total_efectivo:,.0f} €")
     
-    # Calcular P&L Global usando el Ledger de compras
     pnl_global_eur = 0.0
     historial = estado_cartera.get("historial_compras", [])
-    
     filas_rentabilidad = []
+    
     for nombre, info in ACTIVOS_RADAR.items():
-        if info.get("es_monetario"): continue # El monetario es efectivo
-        
+        if info.get("es_monetario"): continue
         d = get_market_data(info["ticker"])
         if not d: continue
-        
-        # Filtrar compras de este activo
         compras_act = [c for c in historial if c["activo"] == nombre]
-        
         if compras_act:
             cap_invertido = sum(c["importe"] for c in compras_act)
             participaciones = sum(c["importe"] / c["precio"] for c in compras_act)
@@ -302,40 +345,22 @@ with t_cartera:
             valor_actual = participaciones * d["precio"]
             pnl_eur = valor_actual - cap_invertido
             pnl_pct = (pnl_eur / cap_invertido) * 100 if cap_invertido > 0 else 0
-            
             pnl_global_eur += pnl_eur
-            filas_rentabilidad.append({
-                "Activo": nombre,
-                "Capital Invertido": cap_invertido,
-                "Valor Actual": valor_actual,
-                "P&L (€)": pnl_eur,
-                "P&L (%)": pnl_pct,
-                "Precio Medio Compra": precio_medio_compra,
-                "Precio Actual": d["precio"]
-            })
+            filas_rentabilidad.append({"Activo": nombre, "Capital Invertido": cap_invertido, "Valor Actual": valor_actual, "P&L (€)": pnl_eur, "P&L (%)": pnl_pct, "Precio Medio Compra": precio_medio_compra, "Precio Actual": d["precio"]})
         else:
-            # Si no hay historial (ej. saldo inicial), asumimos que el saldo actual es el capital
             saldo_actual = estado_cartera["saldos"].get(nombre, 0)
             if saldo_actual > 0:
-                filas_rentabilidad.append({
-                    "Activo": nombre, "Capital Invertido": saldo_actual, "Valor Actual": saldo_actual,
-                    "P&L (€)": 0.0, "P&L (%)": 0.0, "Precio Medio Compra": d["precio"], "Precio Actual": d["precio"]
-                })
+                filas_rentabilidad.append({"Activo": nombre, "Capital Invertido": saldo_actual, "Valor Actual": saldo_actual, "P&L (€)": 0.0, "P&L (%)": 0.0, "Precio Medio Compra": d["precio"], "Precio Actual": d["precio"]})
                 
     m4.metric("P&L Global (Market)", f"{pnl_global_eur:+,.0f} €", delta_color="normal")
     
-    # 2. Gráficos
     col_g1, col_g2 = st.columns([1, 1])
-    
     with col_g1:
         st.markdown("#### 🍩 Distribución del Patrimonio")
         fig_pie = go.Figure(data=[go.Pie(
             labels=["Fondos Indexados", "Oro/BTC", "Cuentas Efectivo"],
-            values=[total_invertido - sum(estado_cartera["saldos"].get(k, 0) for k in LARGO_PLAZO.keys()), 
-                    sum(estado_cartera["saldos"].get(k, 0) for k in LARGO_PLAZO.keys()),
-                    total_efectivo],
-            hole=.4,
-            marker_colors=["#3b82f6", "#f59e0b", "#10b981"]
+            values=[total_invertido - sum(estado_cartera["saldos"].get(k, 0) for k in LARGO_PLAZO.keys()), sum(estado_cartera["saldos"].get(k, 0) for k in LARGO_PLAZO.keys()), total_efectivo],
+            hole=.4, marker_colors=["#3b82f6", "#f59e0b", "#10b981"]
         )])
         fig_pie.update_layout(template="plotly_dark", height=300, margin=dict(l=10, r=10, t=10, b=10))
         st.plotly_chart(fig_pie, use_container_width=True)
@@ -345,28 +370,13 @@ with t_cartera:
         if filas_rentabilidad:
             df_pnl = pd.DataFrame(filas_rentabilidad)
             df_pnl = df_pnl[df_pnl["Capital Invertido"] > 0]
-            fig_bar = go.Figure(go.Bar(
-                x=df_pnl["P&L (€)"],
-                y=df_pnl["Activo"],
-                orientation='h',
-                marker_color=np.where(df_pnl["P&L (€)"] > 0, '#22c55e', '#ef4444')
-            ))
+            fig_bar = go.Figure(go.Bar(x=df_pnl["P&L (€)"], y=df_pnl["Activo"], orientation='h', marker_color=np.where(df_pnl["P&L (€)"] > 0, '#22c55e', '#ef4444')))
             fig_bar.update_layout(template="plotly_dark", height=300, margin=dict(l=10, r=10, t=10, b=10))
             st.plotly_chart(fig_bar, use_container_width=True)
-        else:
-            st.info("Aún no hay historial de compras registrado.")
             
-    # 3. Tabla Detallada (Ledger)
     st.markdown("#### 📋 Detalle de Rendimiento Real (PMC)")
     if filas_rentabilidad:
-        df_detalle = pd.DataFrame(filas_rentabilidad)
-        st.dataframe(df_detalle.style.format({
-            "Capital Invertido": "{:,.2f} €", "Valor Actual": "{:,.2f} €",
-            "P&L (€)": "{:+,.2f} €", "P&L (%)": "{:+.2f}%",
-            "Precio Medio Compra": "{:,.2f}", "Precio Actual": "{:,.2f}"
-        }), use_container_width=True, hide_index=True)
-    else:
-        st.info("Registra tu primera compra para empezar a calcular el Coste Medio Ponderado.")
+        st.dataframe(pd.DataFrame(filas_rentabilidad).style.format({"Capital Invertido": "{:,.2f} €", "Valor Actual": "{:,.2f} €", "P&L (€)": "{:+,.2f} €", "P&L (%)": "{:+.2f}%", "Precio Medio Compra": "{:,.2f}", "Precio Actual": "{:,.2f}"}), use_container_width=True, hide_index=True)
 
 # --- PESTAÑA 1: FONDOS ---
 with t_fondos:
@@ -376,20 +386,14 @@ with t_fondos:
         d = get_market_data(info["ticker"])
         if not d: continue
         o_act = float(estado_cartera["objetivos"].get(nombre, CAPITAL_RADAR_DEFAULT * info["peso_obj"]))
-        
-        # Lógica simplificada de evaluación
-        caida = d["caida"]; factor = 0.85 if (d['dist_sma'] < 0 and not d['macd_alcista']) else 1.0
-        if d['la_bonita']: factor = 0.90
-        gatillo_teorico = d["max52"] * (1.0 + info["c1"]); gatillo_aplicado = d["max52"] * (1.0 + info["c1"]*factor)
-        
-        est_c = "ESPERAR"
-        if caida <= info["c1"]*factor: est_c = "COMPRAR ZONA 1"
-        elif caida <= info["c2"]*factor: est_c = "COMPRAR ZONA 2"
-        elif caida <= info["c3"]*factor: est_c = "COMPRAR ZONA 3"
-        
+        est_c = evaluar_fondo(d, info, modo_buffer)
         dca = evaluar_semaforo_dca(d)
         
         with st.expander(f"{'🟢' if 'COMPRAR' in est_c else '⚪'} **{nombre}** | {est_c}"):
+            # PANEL DE INDICADORES
+            render_indicadores(d)
+            
+            # TARJETA DCA
             st.markdown(f"""
             <div class="dca-card" style="background-color: {dca['bg']}; border-left-color: {dca['border']};">
                 <div class="dca-icon">{dca['icon']}</div>
@@ -398,7 +402,11 @@ with t_fondos:
             </div>
             """, unsafe_allow_html=True)
             
-            st.write(f"Gatillo aplicado: {gatillo_aplicado:,.2f} | Falta: {abs(caida - info['c1']*factor):.2%}")
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Caída (ATH)", f"{d['caida']:.2%}")
+            c2.metric("Gatillo Teórico (Z1)", f"{d['max52']*(1+info['c1']):,.2f}")
+            c3.metric("Gatillo con Buffer", f"{d['max52']*(1+info['c1']*calcular_factor_buffer(d, modo_buffer)):,.2f}")
+            
             if "COMPRAR" in est_c:
                 teur = max(o_act, 1000)*0.3
                 if st.button(f"📦 Registrar Traspaso de {teur:,.0f} €", key=f"btn_{nombre}"): 
@@ -414,23 +422,18 @@ with t_cortos:
         señal, msg, ventanas = detectar_trampa_consenso(d, d["hist"])
         
         st.markdown(f"#### ⚡ {nombre}")
-        cols = st.columns(5)
-        cols[0].metric("Precio", f"{d['precio']:,.2f}")
-        cols[1].metric("RSI", f"{d['rsi']:.1f}")
-        cols[2].metric("MACD", "🟢 Alcista" if d['macd_alcista'] else "🔴 Bajista")
-        cols[3].metric("La Bonita", "✨" if d['la_bonita'] else "No")
+        render_indicadores(d) # Mostramos el panel aquí también
         
         if ventanas:
             v_cols = st.columns(len(ventanas))
             for i, (w, act) in enumerate(ventanas.items()): v_cols[i].metric(f"Ventana {w}", "✅" if act else "❌")
-        
+            
         if señal and "ROBUSTA" in msg:
             st.markdown(f'<div class="semaforo-rojo"><b>🎯 CORTO ACTIVO</b><br>{msg}<br>Entrada: {señal["entrada"]:.2f} | Stop: {señal["stop_loss"]:.2f}</div>', unsafe_allow_html=True)
         elif señal and "DÉBIL" in msg:
             st.markdown(f'<div class="semaforo-amarillo"><b>⚠️ SEÑAL DÉBIL</b><br>{msg}</div>', unsafe_allow_html=True)
         else:
             st.info(f"⏳ Esperando: {msg}")
-            
         st.plotly_chart(graficar_activo(d["hist"], nombre), use_container_width=True)
 
 # --- PESTAÑA 3: ORO Y BTC ---
@@ -440,14 +443,15 @@ with t_largo:
         d = get_market_data(info["ticker"])
         if not d: continue
         o_act = float(estado_cartera["objetivos"].get(nombre, CAPITAL_RADAR_DEFAULT * info["peso_obj"]))
-        caida = d["caida"]
-        est_c = "ESPERAR"
-        if caida <= info["c3"]: est_c = "COMPRAR ZONA 3"
-        elif caida <= info["c2"]: est_c = "COMPRAR ZONA 2"
-        elif caida <= info["c1"]: est_c = "COMPRAR ZONA 1"
         
+        est_c = evaluar_largo_plazo(d, info, v_info)
         dca = evaluar_semaforo_dca(d)
-        with st.expander(f"{'🟢' if 'COMPRAR' in est_c else '⚪'} **{nombre}** | {est_c}"):
+        
+        with st.expander(f"{'🟢' if 'COMPRAR' in est_c else '🔴' if 'BLOQUEADO' in est_c else '⚪'} **{nombre}** | {est_c}"):
+            # PANEL DE INDICADORES
+            render_indicadores(d)
+            
+            # TARJETA DCA
             st.markdown(f"""
             <div class="dca-card" style="background-color: {dca['bg']}; border-left-color: {dca['border']};">
                 <div class="dca-icon">{dca['icon']}</div>
@@ -456,11 +460,23 @@ with t_largo:
             </div>
             """, unsafe_allow_html=True)
             
-            st.write(f"Caída actual: {caida:.2%} | Próximo gatillo: {d['max52']*(1+info['c1']):,.2f}")
-            if "COMPRAR" in est_c:
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Caída (ATH)", f"{d['caida']:.2%}")
+            c2.metric("Próximo Gatillo", f"{d['max52']*(1+info['c1']):,.2f}")
+            c3.metric("RSI", f"{d['rsi']:.1f}")
+            
+            if "BLOQUEADO VIX" in est_c:
+                st.error(f"🛡️ **BLOQUEADO POR PÁNICO:** Caída del {d['caida']:.1%} pero VIX en {v_info['actual']:.1f} (por debajo de 20). El mercado no tiene pánico institucional. Cava dice: NO COMPRES AÚN.")
+            elif "COMPRAR" in est_c:
                 teur = max(o_act, 1000)*0.3
                 if st.button(f"🛒 Registrar Compra de {teur:,.0f} €", key=f"btn_{nombre}"): 
                     registrar_orden(nombre, teur, d["precio"], info["ticker"]); st.rerun()
+                    
+            if "BTC" in info["ticker"]:
+                st.markdown('<div class="aviso-mercado">₿ <b>Bitcoin cotiza 24/7.</b> Los indicadores pueden cambiar durante el fin de semana.</div>', unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="aviso-mercado">🥇 <b>Oro cerrado en fin de semana.</b> El precio mostrado es el cierre del viernes.</div>', unsafe_allow_html=True)
+                    
             st.plotly_chart(graficar_activo(d["hist"], nombre), use_container_width=True)
 
 # --- PESTAÑA 4: ÓRDENES ---
@@ -473,8 +489,6 @@ with t_ordenes:
         d_merc = get_market_data(o["ticker"])
         p_act = d_merc["precio"] if d_merc else o["precio_ord"]
         pnl = (p_act / o["precio_ord"] - 1) * 100
-        
         st.markdown(f"""<div class="card-orden"><b>{o['activo']}</b> | Importe: {o['importe']:,.0f} €<br>Liquidación: <b>{d_liq.strftime('%d/%m')}</b><br>P&L Estimado: <b>{pnl:+.2f}%</b></div>""", unsafe_allow_html=True)
-        
         if st.button(f"✅ Marcar como Liquidada (Registrar PMC)", key=f"liq_{o['id']}"):
             liquidar_orden(o["id"])
